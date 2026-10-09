@@ -1,0 +1,34 @@
+# ================= 知契·智能教育助手 依赖 =================
+# 精简自 conda 环境 pip freeze，只保留项目实际 import 的包
+
+# ---- Web 服务（FastAPI + SSE + WebSocket）----
+fastapi==0.136.1
+uvicorn==0.46.0
+python-multipart==0.0.20        # 图片/语音 multipart 表单上传
+aiohttp==3.11.16                # 语音转录/TTS 转发硅基流动 API
+
+# ---- LLM / 推理 ----
+openai==1.93.0                  # AsyncOpenAI 兼容客户端（GLM/Qwen/VL）
+requests==2.33.1                # embedding_client 请求
+httpx==0.28.1                   # web_search / web_fetch 工具
+
+# ---- RAG 教材检索 ----
+faiss-cpu==1.9.0                # 向量索引（IndexFlatIP 余弦相似度）
+numpy==1.26.4
+PyMuPDF==1.24.1                 # PDF 教材解析（懒加载）
+python-docx==1.1.2              # Word 教材解析（懒加载）
+beautifulsoup4==4.13.3          # HTML 解析
+
+# ---- 渠道与工具 ----
+lark-oapi==1.6.1                # 飞书 WebSocket + REST
+bilibili-api-python==17.4.2     # B 站教学视频搜索（版本锁定，勿升级）
+mcp==1.27.0                     # MCP 工具桥接（古诗词服务）
+
+# ---- 数据 / 安全 ----
+aiosqlite==0.22.1               # SQLite 异步访问（WAL + 外键级联）
+bcrypt==4.3.0                   # 用户密码加盐哈希
+
+# ---- 专注监控（YOLOv8-pose 本地推理）----
+ultralytics==8.4.140
+opencv-python==4.11.0.86
+pillow==10.4.0                  # 上传图片校验/处理

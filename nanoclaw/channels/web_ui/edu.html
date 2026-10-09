@@ -1,0 +1,2848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知契 · AI 对话教学</title>
+    <!-- 品牌图标 favicon（与登录页同源） -->
+    <link rel="icon" type="image/png" href="/static/logo.png">
+
+    <!-- Markdown 渲染库：本地文件，不依赖外部 CDN（CDN 被墙/断网会导致整个页面 JS 失效） -->
+    <script src="/static/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #eef5fd;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f7fbff;
+            --bg-input: #ffffff;
+            --border-subtle: rgba(242, 143, 177, 0.25);
+            --border-input: rgba(111, 192, 245, 0.45);
+            --text-primary: #4a5382;
+            --text-secondary: #8b93b8;
+            --text-muted: #b8bfd8;
+            --accent: #f27ba9;
+            --accent-hover: #ee5f98;
+            --accent-glow: rgba(242, 123, 169, 0.18);
+            --accent-blue: #6fc0f5;
+            --danger: #ef5350;
+            --scrollbar: rgba(242, 143, 177, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #e3f2fd 0%, #fdf0f5 55%, #fce4ec 100%);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+
+        /* ============ 三栏整体布局 ============ */
+        .app {
+            display: grid;
+            grid-template-columns: 210px 1fr 300px;
+            gap: 12px;
+            height: 100vh;
+            padding: 12px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid var(--border-subtle);
+            border-radius: 18px;
+            box-shadow: 0 4px 18px rgba(242, 143, 177, 0.1);
+        }
+
+        /* ============ 左侧功能栏 ============ */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            padding: 18px 14px;
+            overflow: hidden;
+        }
+
+        .side-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 6px 16px;
+            border-bottom: 1px dashed var(--border-subtle);
+            margin-bottom: 14px;
+        }
+
+        .side-logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(134, 121, 226, 0.25);
+            animation: sway 3s ease-in-out infinite;
+        }
+
+        @keyframes sway {
+            0%, 100% { transform: rotate(-6deg); }
+            50% { transform: rotate(6deg); }
+        }
+
+        .side-logo-name {
+            font-size: 17px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f27ba9, #6fc0f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .side-logo-sub { font-size: 10.5px; color: var(--text-muted); }
+
+        .side-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin: 4px 6px 8px;
+            letter-spacing: 1px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--accent-glow);
+            color: var(--accent-hover);
+            transform: translateX(3px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(242,123,169,0.15), rgba(111,192,245,0.15));
+            border-color: var(--border-input);
+            color: var(--accent-hover);
+            font-weight: 600;
+        }
+
+        .nav-item .nav-icon {
+            font-size: 17px;
+            width: 22px;        /* 固定占位宽度：不同 emoji 宽度不一，统一后文字列才能对齐 */
+            flex-shrink: 0;
+            text-align: center;
+            line-height: 1;     /* 收紧行高，消除 emoji 基线偏移造成的忽高忽低 */
+        }
+
+        .side-footer {
+            margin-top: auto;
+            padding: 12px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #fde3ef, #dceefe);
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        /* ============ 中间主区 ============ */
+        .main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 顶栏：标题 + 用户信息 */
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .topbar-title {
+            font-size: 17px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f27ba9, #6fc0f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .topbar-sub { font-size: 11px; color: var(--text-muted); }
+
+        .ctx-select {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-input);
+            border-radius: 20px;
+            padding: 7px 12px;
+            font-size: 12.5px;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+
+        .ctx-select:hover { border-color: var(--accent); }
+
+        .topbar .spacer { flex: 1; }
+
+        /* 用户信息卡（右上） */
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 14px 7px 8px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #fde3ef, #dceefe);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(242, 143, 177, 0.25);
+        }
+
+        .user-name { font-size: 13.5px; font-weight: 600; }
+
+        .user-meta { font-size: 10.5px; color: var(--text-secondary); }
+
+        /* 弹窗底部操作行：退出登录（左）与保存（右）并列 */
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .modal-actions .modal-submit { flex: 1; margin-top: 0; }
+
+        .modal-logout {
+            flex: 1;
+            border: 1px solid rgba(224, 92, 114, 0.45);
+            border-radius: 999px;
+            padding: 10px 0;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #e05c72;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-logout:hover {
+            background: #fff2f5;
+            border-color: #e05c72;
+            box-shadow: 0 3px 10px rgba(224, 92, 114, 0.18);
+        }
+
+        /* 聊天区 */
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 18px 18px 8px;
+        }
+
+        /* 聊天内容通栏铺满中栏（与快捷 chips / 输入框的 18px 边距对齐），
+           不再限制 780px 居中；气泡自身仍有 84% 宽度上限保证可读性 */
+        .chat-inner { max-width: none; margin: 0; }
+
+        .msg-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            animation: fadeUp 0.25s ease;
+        }
+
+        /* 时间分隔线：两次对话间隔超过 10 分钟时插入 */
+        .time-divider {
+            text-align: center;
+            font-size: 11px;
+            color: #a89fc0;
+            margin: 2px 0 14px;
+            animation: fadeUp 0.25s ease;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg-row.user { flex-direction: row-reverse; }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 19px;
+        }
+
+        .msg-row.companion .avatar {
+            background: linear-gradient(135deg, #fde3ef, #dceefe);
+            border: 1px solid rgba(242, 143, 177, 0.4);
+        }
+
+        .msg-row.user .avatar {
+            background: linear-gradient(135deg, #dceefe, #fde3ef);
+            border: 1px solid rgba(111, 192, 245, 0.4);
+        }
+
+        .bubble {
+            max-width: 84%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.75;
+            overflow-wrap: break-word;
+            box-shadow: 0 2px 10px rgba(242, 143, 177, 0.1);
+        }
+
+        .msg-row.companion .bubble {
+            background: #ffffff;
+            border: 1px solid rgba(242, 143, 177, 0.3);
+            border-top-left-radius: 4px;
+        }
+
+        .msg-row.user .bubble {
+            background: linear-gradient(135deg, #fde3ef, #e8f3fe);
+            border: 1px solid rgba(242, 143, 177, 0.35);
+            border-top-right-radius: 4px;
+        }
+
+        .bubble img.chat-img {
+            max-width: 240px;
+            max-height: 180px;
+            border-radius: 8px;
+            display: block;
+            margin-bottom: 6px;
+            border: 1px solid var(--border-input);
+        }
+
+        /* Markdown 内容样式 */
+        .bubble h1, .bubble h2, .bubble h3, .bubble h4 {
+            margin: 12px 0 8px;
+            color: var(--accent-hover);
+            font-size: 15px;
+        }
+
+        .bubble h1:first-child, .bubble h2:first-child, .bubble h3:first-child { margin-top: 0; }
+
+        .bubble p { margin: 6px 0; }
+
+        .bubble ul, .bubble ol { padding-left: 22px; margin: 6px 0; }
+
+        .bubble table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+
+        .bubble th, .bubble td {
+            border: 1px solid var(--border-input);
+            padding: 7px 10px;
+            text-align: left;
+        }
+
+        .bubble th {
+            background: rgba(242, 143, 177, 0.14);
+            color: var(--accent-hover);
+        }
+
+        .bubble code {
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12.5px;
+        }
+
+        .bubble pre {
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .bubble blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 12px;
+            color: var(--text-secondary);
+            margin: 8px 0;
+        }
+
+        .bubble a { color: var(--accent-blue); }
+
+        /* 欢迎卡片 */
+        .welcome {
+            text-align: center;
+            padding: 26px 20px 10px;
+        }
+
+        .welcome-logo { width: 62px; height: 62px; border-radius: 19px; box-shadow: 0 6px 18px rgba(134, 121, 226, 0.25); animation: sway 3s ease-in-out infinite; display: inline-block; }
+
+        .welcome h2 {
+            font-size: 20px;
+            margin: 10px 0 8px;
+            background: linear-gradient(135deg, #f27ba9, #6fc0f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome p {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.9;
+        }
+
+        .welcome-deco {
+            margin-top: 6px;
+            font-size: 20px;
+            letter-spacing: 12px;
+        }
+
+        /* 快捷操作 */
+        .quick-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 0 18px 8px;
+        }
+
+        .quick-chip {
+            background: #ffffff;
+            border: 1px solid var(--border-input);
+            color: var(--text-secondary);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: all 0.15s;
+            box-shadow: 0 2px 8px rgba(111, 192, 245, 0.15);
+        }
+
+        .quick-chip:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-glow);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(242, 143, 177, 0.25);
+        }
+
+        /* 输入区 */
+        .input-zone {
+            margin: 0 18px 16px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid var(--border-input);
+            border-radius: 16px;
+            padding: 10px 12px;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            box-shadow: 0 4px 16px rgba(242, 143, 177, 0.12);
+        }
+
+        .input-zone:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 4px 20px rgba(242, 143, 177, 0.22);
+        }
+
+        .img-attach-preview {
+            display: none;
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .img-attach-preview img {
+            max-height: 90px;
+            border-radius: 8px;
+            border: 1px solid var(--border-input);
+        }
+
+        .img-attach-preview button {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .input-main {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        #chatInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            line-height: 1.5;
+            max-height: 130px;
+            padding: 4px 2px;
+        }
+
+        #chatInput::placeholder { color: var(--text-muted); }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 6px;
+            opacity: 0.65;
+            transition: opacity 0.15s;
+        }
+
+        .icon-btn:hover { opacity: 1; }
+
+        #sendBtn {
+            background: linear-gradient(135deg, #f27ba9, #6fc0f5);
+            border: none;
+            color: #ffffff;
+            border-radius: 20px;
+            padding: 8px 20px;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            box-shadow: 0 3px 10px rgba(242, 143, 177, 0.35);
+        }
+
+        #sendBtn:hover:not(:disabled) {
+            transform: translateY(-1px) scale(1.03);
+            box-shadow: 0 5px 14px rgba(242, 143, 177, 0.45);
+        }
+
+        #sendBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* 回答进行中：按钮变红色「停止」，点击打断 AI 回答 */
+        #sendBtn.stop {
+            background: #e05c72;
+            box-shadow: 0 3px 10px rgba(224, 92, 114, 0.35);
+        }
+
+        /* 流式气泡被手动打断时的收尾标记 */
+        .stop-note {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed var(--border-subtle);
+            font-size: 11px;
+            color: #a89fc0;
+            font-style: italic;
+        }
+
+        /* 笔记保存结果标记（模型按请求把内容存到本地文件后的反馈行） */
+        .save-note {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed var(--border-subtle);
+            font-size: 12px;
+            color: #6aa84f;
+        }
+        .save-note.failed {
+            color: #e05c72;
+        }
+
+        /* 语音按钮：录音中红色脉冲提示孩子"正在听" */
+        .voice-btn.recording {
+            opacity: 1;
+            animation: voice-pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes voice-pulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(255, 82, 82, 0.8)); }
+            50% { transform: scale(1.18); filter: drop-shadow(0 0 9px rgba(255, 82, 82, 0.95)); }
+        }
+
+        /* 学伴回复气泡下的 🔊 朗读按钮 */
+        .bubble-speak {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 6px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            opacity: 0.55;
+            padding: 2px 4px;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+
+        .bubble-speak:hover { opacity: 1; transform: scale(1.12); }
+        .bubble-speak.speaking { opacity: 1; }
+
+        .input-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            text-align: center;
+        }
+
+        .typing-dots { display: inline-flex; gap: 4px; align-items: center; padding: 6px 0; }
+
+        .typing-dots span {
+            width: 7px;
+            height: 7px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: dot-pulse 1.4s ease-in-out infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes dot-pulse {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ============ 右侧面板 ============ */
+        .rightbar {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow: hidden;
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .knowledge-panel { flex: 1; }
+        .video-panel { flex: 1.2; }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 13px 16px 9px;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .panel-head .panel-badge {
+            margin-left: auto;
+            font-size: 10px;
+            font-weight: 400;
+            color: var(--text-muted);
+            background: var(--bg-primary);
+            border-radius: 10px;
+            padding: 2px 8px;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2px 14px 14px;
+        }
+
+        .panel-empty {
+            color: var(--text-muted);
+            font-size: 12px;
+            text-align: center;
+            padding: 26px 8px;
+            line-height: 1.9;
+        }
+
+        /* 知识点补充 chips */
+        .kn-chip {
+            display: block;
+            background: linear-gradient(135deg, #fde9f2, #e8f3fe);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 12.5px;
+            margin-bottom: 7px;
+            line-height: 1.5;
+            /* 知识点整条是百度百科链接：去掉链接默认样式，悬停提示可点击 */
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .kn-chip:hover {
+            border-color: var(--accent);
+            box-shadow: 0 3px 10px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+
+        .kn-chip .kn-idx {
+            color: var(--accent);
+            font-weight: 700;
+            margin-right: 6px;
+        }
+
+        .kn-chip .kn-link-icon {
+            float: right;
+            font-size: 10.5px;
+            opacity: 0.55;
+        }
+
+        /* 推荐视频列表 */
+        .video-item {
+            display: flex;
+            gap: 10px;
+            padding: 9px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+            margin-bottom: 8px;
+            text-decoration: none;
+            transition: all 0.15s;
+            background: #fff;
+        }
+
+        .video-item:hover {
+            border-color: var(--accent);
+            transform: translateX(3px);
+            box-shadow: 0 3px 10px rgba(242, 143, 177, 0.18);
+        }
+
+        .video-icon {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #fde3ef, #dceefe);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+        }
+
+        .video-title {
+            font-size: 12px;
+            color: var(--text-primary);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .video-item:hover .video-title { color: var(--accent-hover); }
+
+        /* ============ 错题集抽屉 ============ */
+        .drawer-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(74, 83, 130, 0.35);
+            display: none;
+            z-index: 40;
+        }
+
+        .drawer-mask.open { display: block; }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 420px;
+            max-width: 92vw;
+            height: 100%;
+            background: #ffffff;
+            border-left: 1px solid var(--border-subtle);
+            z-index: 50;
+            transition: right 0.25s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .drawer.open { right: 0; }
+
+        .drawer-head {
+            display: flex;
+            align-items: center;
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .drawer-head h3 { font-size: 15px; flex: 1; }
+
+        .drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 16px;
+        }
+
+        .drawer .notice {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            margin: 8px 0 0;
+        }
+
+        .wrong-entry {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .wrong-entry summary {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 13px;
+            cursor: pointer;
+            font-size: 12.5px;
+            list-style: none;
+        }
+
+        .wrong-entry summary::-webkit-details-marker { display: none; }
+        .wrong-entry summary:hover { background: rgba(242, 143, 177, 0.08); }
+
+        .wrong-verdict { flex-shrink: 0; font-size: 11.5px; }
+
+        .wrong-question {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .wrong-time { flex-shrink: 0; color: var(--text-muted); font-size: 10.5px; }
+
+        .wrong-entry .btn-ghost {
+            flex-shrink: 0;
+            background: transparent;
+            border: 1px solid var(--border-input);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            padding: 3px 9px;
+            font-size: 10.5px;
+            cursor: pointer;
+        }
+
+        .wrong-entry .btn-ghost:hover { border-color: var(--danger); color: var(--danger); }
+
+        .wrong-entry .bubble-content {
+            border-top: 1px solid var(--border-subtle);
+            padding: 4px 14px 10px;
+            font-size: 13px;
+            line-height: 1.75;
+        }
+
+        .wrong-empty {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 40px 0;
+            font-size: 13px;
+        }
+
+        /* ===== 错题集：学科分类 tab + 学科标签 + 分析面板 ===== */
+        .wrong-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .wrong-tab {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            border-radius: 999px;
+            padding: 3px 11px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .wrong-tab:hover { border-color: rgba(242, 143, 177, 0.6); }
+
+        .wrong-tab.active {
+            background: rgba(242, 143, 177, 0.85);
+            border-color: transparent;
+            color: #fff;
+        }
+
+        .wrong-tab.wrong-analysis-btn { margin-left: auto; }
+
+        .wrong-subject-tag {
+            flex-shrink: 0;
+            font-size: 10.5px;
+            color: #ad1457;
+            background: rgba(242, 143, 177, 0.16);
+            border-radius: 6px;
+            padding: 1px 6px;
+        }
+
+        .wrong-analysis {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .wrong-analysis.loading {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 18px 0;
+        }
+
+        .wrong-analysis.error {
+            color: var(--danger);
+        }
+
+        /* ===== 居中弹窗（编辑资料 / 学习计划选择） ===== */
+        .modal-mask {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(80, 60, 90, 0.35);
+            backdrop-filter: blur(3px);
+            z-index: 60;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-mask.open { display: flex; }
+
+        .modal {
+            width: 360px;
+            max-width: 92vw;
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 18px 50px rgba(180, 120, 160, 0.35);
+            overflow: hidden;
+            animation: modalPop 0.22s ease;
+        }
+
+        @keyframes modalPop {
+            from { transform: scale(0.92) translateY(10px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .modal-head {
+            display: flex;
+            align-items: center;
+            padding: 15px 18px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .modal-head h3 { font-size: 15px; flex: 1; }
+
+        .modal-body { padding: 16px 18px 20px; }
+
+        .modal-label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 10px 0 5px;
+        }
+
+        .modal-field {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--border-input);
+            border-radius: 9px;
+            padding: 9px 11px;
+            font-size: 13px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-field:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: #fff;
+        }
+
+        .modal-field:disabled { opacity: 0.65; cursor: not-allowed; }
+
+        /* ===== 头像选择网格 ===== */
+        .avatar-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 7px;
+        }
+
+        .avatar-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            font-size: 20px;
+            border-radius: 11px;
+            border: 2px solid transparent;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .avatar-option:hover { transform: scale(1.12); background: #fff; }
+
+        .avatar-option.selected {
+            border-color: var(--accent);
+            background: #fff;
+            box-shadow: 0 2px 10px var(--accent-glow);
+        }
+
+        /* 头像选择区：当前头像预览 + emoji 网格 */
+        .avatar-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #avatarPreview {
+            width: 52px;
+            height: 52px;
+            font-size: 28px;
+            border-radius: 14px;
+            cursor: default;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        /* 头像为导入图片时用 img 填满 */
+        .avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: inherit;
+        }
+
+        .avatar-upload-btn {
+            margin-top: 10px;
+            border: 1.5px dashed var(--border-input);
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border-radius: 9px;
+            padding: 7px 14px;
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .avatar-upload-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #fff;
+        }
+
+        .modal-submit {
+            width: 100%;
+            margin-top: 16px;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 0;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #fff;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2, #6fc0f5));
+            transition: all 0.2s;
+        }
+
+        .modal-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 16px var(--accent-glow); }
+
+        /* 头像卡可点击提示 */
+        .user-card { cursor: pointer; position: relative; transition: all 0.2s; }
+        .user-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px var(--accent-glow); }
+        .user-edit-hint {
+            font-size: 11px;
+            opacity: 0.55;
+            margin-left: 4px;
+        }
+
+        /* 窄屏适配：右侧面板隐藏 */
+        @media (max-width: 1100px) {
+            .app { grid-template-columns: 200px 1fr; }
+            .rightbar { display: none; }
+        }
+
+        @media (max-width: 760px) {
+            .app { grid-template-columns: 1fr; padding: 8px; gap: 8px; }
+            .sidebar { display: none; }
+            .bubble { max-width: 90%; }
+        }
+
+        /* ============ 专注模式浮动状态卡（YOLO 监督） ============ */
+        .focus-card {
+            position: fixed;
+            top: 66px;
+            right: 16px;
+            width: 320px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 12px 14px;
+            z-index: 900;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .focus-card.open { display: flex; }
+
+        .focus-head { display: flex; align-items: center; gap: 8px; }
+
+        .focus-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: focusPulse 1.6s infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes focusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+
+        .focus-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .focus-stop {
+            background: transparent;
+            border: 1px solid var(--border-input);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            font-size: 11px;
+            padding: 3px 8px;
+            cursor: pointer;
+        }
+
+        .focus-stop:hover { border-color: var(--danger); color: var(--danger); }
+
+        .focus-line {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .focus-line b { color: var(--text-primary); font-weight: 600; }
+
+        .focus-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+<div class="app">
+
+    <!-- ============ 左侧功能栏 ============ -->
+    <aside class="sidebar card">
+        <div class="side-logo">
+            <img class="side-logo-icon" src="/static/logo.png" alt="知契">
+            <div>
+                <div class="side-logo-name">知契</div>
+                <div class="side-logo-sub">智能学习伙伴</div>
+            </div>
+        </div>
+
+        <div class="side-title">功 能 导 航</div>
+        <div class="nav-item active" data-nav="chat"><span class="nav-icon">💬</span>对话学习</div>
+        <div class="nav-item" data-nav="grade"><span class="nav-icon">📷</span>作业答疑</div>
+        <div class="nav-item" data-nav="plan"><span class="nav-icon">📅</span>学习计划</div>
+        <div class="nav-item" data-nav="explain"><span class="nav-icon">💡</span>考点精讲</div>
+        <div class="nav-item" data-nav="quiz"><span class="nav-icon">🎯</span>出题练习</div>
+        <div class="nav-item" data-nav="wrong"><span class="nav-icon">📕</span>错题集</div>
+        <div class="nav-item" data-nav="local"><span class="nav-icon">📁</span>本地资料</div>
+        <div class="nav-item" data-nav="focus"><span class="nav-icon">⏳</span>专注模式</div>
+
+        <div class="side-footer">
+            🌈 费曼学习法<br>
+            学会一个知识最好的方式<br>就是把它讲给别人听
+        </div>
+    </aside>
+
+    <!-- ============ 中间主区 ============ -->
+    <main class="main card">
+        <div class="topbar">
+            <div>
+                <div class="topbar-title">💬 对话学习</div>
+                <div class="topbar-sub">随时提问 · 图片批改 · 视频推荐</div>
+            </div>
+            <div class="spacer"></div>
+            <div class="user-card" id="userCard" title="点击修改资料">
+                <div class="user-avatar" id="userAvatar">🧑‍🎓</div>
+                <div>
+                    <div class="user-name" id="userName">小同学</div>
+                    <div class="user-meta" id="userMeta"></div>
+                </div>
+                <div class="user-edit-hint">✏️</div>
+            </div>
+        </div>
+
+        <div class="chat-box" id="chatBox">
+            <div class="chat-inner">
+                <div class="welcome" id="welcomeCard">
+                    <img class="welcome-logo" src="/static/logo.png" alt="知契">
+                    <h2>嗨，我是知契</h2>
+                    <p>
+                        你的贴身 AI 学习伙伴 · 我会按你的学段来讲解（点击右上角头像可改资料）<br>
+                        可以直接问我任何题目 · 发<b>作业图片</b>帮你批改（错题自动进错题集）<br>
+                        右侧会同步展示<b>知识点补充</b>和<b>推荐教学视频</b>
+                    </p>
+                    <div class="welcome-deco">🌸 ☁️ ⭐ 🎈 🌈</div>
+                </div>
+                <div id="msgList"></div>
+            </div>
+        </div>
+
+        <div class="quick-row">
+            <button class="quick-chip" data-quick="plan">📅 生成周学习计划</button>
+            <button class="quick-chip" data-quick="grade">📷 我要批改作业</button>
+            <button class="quick-chip" data-quick="explain">💡 讲个知识点</button>
+            <button class="quick-chip" data-quick="quiz">🎯 出几道题考考我</button>
+        </div>
+
+        <div class="input-zone">
+            <div class="img-attach-preview" id="attachPreview">
+                <img id="attachImg" alt="待发送图片">
+                <button id="attachRemove" title="移除图片">✕</button>
+            </div>
+            <div class="input-main">
+                <button class="icon-btn" id="attachBtn" title="发送图片（或直接 Ctrl+V 粘贴截图）">📷</button>
+                <textarea id="chatInput" rows="1"
+                    placeholder="输入问题，或粘贴作业截图让知契批改…（Enter 发送 / Shift+Enter 换行）"></textarea>
+                <button class="icon-btn voice-btn" id="voiceBtn" title="点一下开始说话，再点一下结束">🎤</button>
+                <button id="sendBtn">发送</button>
+            </div>
+            <div class="input-hint">点 🎤 说话自动变文字 · 图片支持点击选择 / 拖拽 / Ctrl+V 粘贴 · 批改中判定为 ❌ / ⛔ 的题目会自动进入错题集</div>
+        </div>
+    </main>
+
+    <!-- ============ 右侧面板 ============ -->
+    <aside class="rightbar">
+        <div class="panel knowledge-panel card">
+            <div class="panel-head">📌 知识点补充<span class="panel-badge" id="knBadge">0</span></div>
+            <div class="panel-body" id="knowledgeList">
+                <div class="panel-empty">讲解知识点后<br>这里会自动补充相关要点</div>
+            </div>
+        </div>
+        <div class="panel video-panel card">
+            <div class="panel-head">📺 推荐教学视频<span class="panel-badge" id="videoBadge">0</span></div>
+            <div class="panel-body" id="videoList">
+                <div class="panel-empty">学习一个知识点后<br>这里会推荐对应的B站讲解视频</div>
+            </div>
+        </div>
+    </aside>
+
+</div>
+
+<input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+
+<!-- ============ 错题集抽屉 ============ -->
+<div class="drawer-mask" id="drawerMask"></div>
+<div class="drawer" id="drawer">
+    <div class="drawer-head">
+        <h3>📕 错题集</h3>
+        <button class="quick-chip" id="clearWrongBtn">清空</button>
+        <button class="quick-chip" id="drawerClose">✕</button>
+    </div>
+    <div class="drawer-body">
+        <div class="wrong-tabs" id="wrongTabs">
+            <button class="wrong-tab active" data-subject="全部">全部</button>
+            <button class="wrong-tab" data-subject="语文">语文</button>
+            <button class="wrong-tab" data-subject="数学">数学</button>
+            <button class="wrong-tab" data-subject="英语">英语</button>
+            <button class="wrong-tab" data-subject="物理">物理</button>
+            <button class="wrong-tab" data-subject="化学">化学</button>
+            <button class="wrong-tab" data-subject="其他">其他</button>
+            <button class="wrong-tab wrong-analysis-btn" id="wrongAnalysisBtn" title="按当前学科生成薄弱点分析">📊 分析</button>
+        </div>
+        <div class="wrong-analysis" id="wrongAnalysisPanel" hidden></div>
+        <div id="wrongBookList"></div>
+        <div class="notice">对话中批改出 ❌ 错误 / ⛔ 未作答 的题目自动收录并识别学科（云端保存，换设备登录也能看到）</div>
+    </div>
+</div>
+
+<!-- ============ 编辑资料弹窗（点击右上角头像打开） ============ -->
+<div class="modal-mask" id="profileMask">
+    <div class="modal">
+        <div class="modal-head">
+            <h3>✏️ 编辑资料</h3>
+            <button class="quick-chip" id="profileClose">✕</button>
+        </div>
+        <div class="modal-body">
+            <label class="modal-label">头像（选 emoji 或导入本地图片）</label>
+            <div class="avatar-row">
+                <div class="avatar-option selected" id="avatarPreview">🧑‍🎓</div>
+                <div class="avatar-grid" id="avatarGrid"></div>
+            </div>
+            <button type="button" class="avatar-upload-btn" id="avatarUploadBtn">🖼️ 导入本地图片</button>
+            <input type="file" id="avatarFileInput" accept="image/*" style="display:none">
+            <label class="modal-label">昵称（默认"小同学"，可随时修改）</label>
+            <input class="modal-field" id="profileNickname" maxlength="20">
+            <label class="modal-label">账号（登录凭证，不可修改）</label>
+            <input class="modal-field" id="profileUsername" disabled>
+            <label class="modal-label">年级</label>
+            <select class="modal-field" id="profileGrade"></select>
+            <div class="form-error" id="profileError" style="display:none"></div>
+            <div class="modal-actions">
+                <button class="modal-logout" id="logoutBtn" title="退出当前账号，返回登录页">⎋ 退出登录</button>
+                <button class="modal-submit" id="profileSave">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 学习计划选择弹窗（点"学习计划"时打开） ============ -->
+<div class="modal-mask" id="planMask">
+    <div class="modal">
+        <div class="modal-head">
+            <h3>📅 选择年级和科目</h3>
+            <button class="quick-chip" id="planClose">✕</button>
+        </div>
+        <div class="modal-body">
+            <label class="modal-label">年级</label>
+            <select class="modal-field" id="planGrade"></select>
+            <label class="modal-label">科目</label>
+            <select class="modal-field" id="planSubject"></select>
+            <button class="modal-submit" id="planConfirm">生成周学习计划</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 专注模式浮动状态卡（YOLO 监督，开启时显示；摄像头画面不展示，提醒走语音） ============ -->
+<div class="focus-card" id="focusCard">
+    <div class="focus-head">
+        <span class="focus-dot" id="focusDot"></span>
+        <span class="focus-title">专注监督中</span>
+        <button class="focus-stop" id="focusStopBtn">结束</button>
+    </div>
+    <div class="focus-line" id="focusInfo">等待首轮检测结果…</div>
+    <div class="focus-meta" id="focusMeta"></div>
+</div>
+
+<script>
+    /* ======================================================
+       配置：年级科目白名单（与后端 edu_service.py 保持一致）
+    ======================================================= */
+    const SUBJECTS_BY_GRADE = {
+        1: ["语文", "数学", "英语"], 2: ["语文", "数学", "英语"], 3: ["语文", "数学", "英语"],
+        4: ["语文", "数学", "英语"], 5: ["语文", "数学", "英语"], 6: ["语文", "数学", "英语"],
+        7: ["语文", "数学", "英语"], 8: ["语文", "数学", "英语", "物理"],
+        9: ["语文", "数学", "英语", "物理", "化学"],
+    };
+    const GRADE_LABELS = {
+        1: "小学一年级", 2: "小学二年级", 3: "小学三年级",
+        4: "小学四年级", 5: "小学五年级", 6: "小学六年级",
+        7: "初中一年级", 8: "初中二年级", 9: "初中三年级",
+    };
+
+    /* ======================================================
+       登录态校验：未登录跳回登录页
+    ======================================================= */
+    const CURRENT_USER_KEY = 'zhiqi_current_user';
+    let currentUser = null;
+    try { currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY)); } catch { currentUser = null; }
+    // 下方整块初始化都在登录守卫内，未登录时跳过执行（避免引用空用户报错）
+    if (currentUser && currentUser.username) {
+    // 年级在注册时确定，进入后可通过右上角头像"编辑资料"修改
+    let userGrade = currentUser.grade_level || 3;
+
+    /* ======================================================
+       DOM 元素
+    ======================================================= */
+    // AI 对话形象：温柔女老师（本地 SVG，与页面粉蓝风格一致；favicon/logo 品牌图另有其源）
+    const AI_AVATAR_HTML = '<img class="avatar-img" src="/static/teacher_avatar.svg" alt="知契老师">';
+    const userName = document.getElementById('userName');
+    const userMeta = document.getElementById('userMeta');
+    const chatBox = document.getElementById('chatBox');
+    const msgList = document.getElementById('msgList');
+    const welcomeCard = document.getElementById('welcomeCard');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const attachBtn = document.getElementById('attachBtn');
+    const fileInput = document.getElementById('fileInput');
+    const attachPreview = document.getElementById('attachPreview');
+    const attachImg = document.getElementById('attachImg');
+    const attachRemove = document.getElementById('attachRemove');
+    const drawer = document.getElementById('drawer');
+    const drawerMask = document.getElementById('drawerMask');
+    const drawerClose = document.getElementById('drawerClose');
+    const wrongBookList = document.getElementById('wrongBookList');
+    const clearWrongBtn = document.getElementById('clearWrongBtn');
+    const wrongTabs = document.getElementById('wrongTabs');
+    const wrongAnalysisBtn = document.getElementById('wrongAnalysisBtn');
+    const wrongAnalysisPanel = document.getElementById('wrongAnalysisPanel');
+    const knowledgeList = document.getElementById('knowledgeList');
+    const knBadge = document.getElementById('knBadge');
+    const videoList = document.getElementById('videoList');
+    const videoBadge = document.getElementById('videoBadge');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const focusCard = document.getElementById('focusCard');
+    const focusDot = document.getElementById('focusDot');
+    const focusStopBtn = document.getElementById('focusStopBtn');
+    const focusInfo = document.getElementById('focusInfo');
+    const focusMeta = document.getElementById('focusMeta');
+
+    /* ======================================================
+       页面状态
+    ======================================================= */
+    let chatHistory = [];        // [{role, text, image_data_url?}]，发给后端的对话上下文
+    let attachDataUrl = null;    // 待发送图片
+    let isSubmitting = false;
+
+    /* ======================================================
+       工具函数
+    ======================================================= */
+    function escapeHtml(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // ============================================================
+    // LaTeX 数学符号兜底转换：模型偶尔仍会输出 LaTeX 语法（\frac{1}{2}、
+    // $x^2$、H_{2}O 等），Markdown 会吃掉反斜杠和星号导致"乱码"。
+    // 在 marked 解析前统一转成 Unicode 符号（×÷≤√π、²³、H₂O 等）。
+    // 跳过 ``` 代码块，避免破坏代码展示。
+    // ============================================================
+    const SUP_MAP = { '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','−':'⁻','=':'⁼','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ','a':'ᵃ','b':'ᵇ','c':'ᶜ','d':'ᵈ','e':'ᵉ','f':'ᶠ','g':'ᵍ','x':'ˣ','y':'ʸ','m':'ᵐ','t':'ᵗ' };
+    const SUB_MAP = { '0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','−':'₋','=':'₌','(':'₍',')':'₎','n':'ₙ','i':'ᵢ','a':'ₐ','e':'ₑ','o':'ₒ','x':'ₓ' };
+    const toSup = s => [...s].map(c => SUP_MAP[c] ?? c).join('');
+    const toSub = s => [...s].map(c => SUB_MAP[c] ?? c).join('');
+    // LaTeX 命令 → Unicode 符号（\b 词边界保证 \in 不误吃 \infty，长名在前双保险）
+    const CMD_MAP = {
+        'times':'×','div':'÷','cdot':'·','cdots':'⋯','pm':'±','mp':'∓',
+        'leqslant':'≤','leq':'≤','le':'≤','geqslant':'≥','geq':'≥','ge':'≥',
+        'neq':'≠','ne':'≠','approx':'≈','equiv':'≡','propto':'∝','sim':'～',
+        'pi':'π','alpha':'α','beta':'β','gamma':'γ','Delta':'Δ','delta':'δ',
+        'theta':'θ','lambda':'λ','mu':'μ','rho':'ρ','sigma':'σ','omega':'ω',
+        'Omega':'Ω','varphi':'φ','phi':'φ','degree':'°','circ':'°','infty':'∞',
+        'angle':'∠','perp':'⊥','parallel':'∥','because':'∵','therefore':'∴',
+        'rightarrow':'→','leftarrow':'←','Rightarrow':'⇒','leftrightarrow':'⇔',
+        'in':'∈','notin':'∉','subset':'⊂','cup':'∪','cap':'∩','ldots':'…',
+        'sin':'sin','cos':'cos','tan':'tan','sec':'sec','csc':'csc','cot':'cot',
+        'log':'log','ln':'ln','lg':'lg','text':''
+    };
+
+    function normalizeMathSymbols(input) {
+        // 按 ``` 代码块切分，只处理代码块外的内容
+        const segs = input.split('```');
+        for (let si = 0; si < segs.length; si += 2) {
+            let t = segs[si];
+            // 1) 去掉数学定界符：$$...$$、$...$、\(...\)、\[...\]；\text{...}/\mathrm{...} 取内容
+            t = t.replace(/\$\$([\s\S]+?)\$\$/g, '$1').replace(/\$([^\s$][^$\n]*?)\$/g, '$1')
+                 .replace(/\\\(([\s\S]+?)\\\)/g, '$1').replace(/\\\[([\s\S]+?)\\\]/g, '$1')
+                 .replace(/\\(?:text|mathrm|mathbf|mathit)\s*\{([^{}]*)\}/g, '$1');
+            // 2) \frac{a}{b}、\dfrac、\tfrac → a/b（单字符不带括号，嵌套迭代 3 层）
+            for (let i = 0; i < 3; i++) {
+                t = t.replace(/\\(?:dfrac|tfrac|frac)\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g,
+                    (_, a, b) => (a.length === 1 && b.length === 1) ? `${a}/${b}` : `(${a})/(${b})`);
+                t = t.replace(/\\(?:dfrac|tfrac|frac)\s*(\d)\s*\/?\s*(\d)/g, '$1/$2');
+            }
+            // 3) \sqrt{...} → √(...)，\sqrt x → √x；^\circ/^\degree → °（防 ^ 残留）
+            for (let i = 0; i < 3; i++) {
+                t = t.replace(/\\sqrt\s*\{([^{}]*)\}/g, '√($1)');
+                t = t.replace(/\\sqrt\s*(\d|[a-zA-Z])/g, '√$1');
+            }
+            t = t.replace(/\^\s*\\(?:circ|degree)/g, '°');
+            // 4) 上标 ^{...}/^n → ⁵ ² ⁿ 等；下标 _{...}/_n → ₂ 等
+            t = t.replace(/\^\{([^{}]+)\}/g, (_, s) => toSup(s));
+            t = t.replace(/\^(-?\d|[a-zA-Z])/g, (_, s) => toSup(s));
+            t = t.replace(/_\{([^{}]+)\}/g, (_, s) => toSub(s));
+            t = t.replace(/_(\d|[a-zA-Z])/g, (_, s) => toSub(s));
+            // 5) \left \right 成对括号剥离
+            t = t.replace(/\\left|\\right/g, '');
+            // 6) LaTeX 命令统一替换（\b 词边界防误伤）
+            t = t.replace(/\\([a-zA-Z]+)/g, (m, name) => {
+                if (name in CMD_MAP) return CMD_MAP[name];
+                return name;   // 未知命令退化为去掉反斜杠的单词，避免残留"乱码"
+            });
+            // 7) 字母数字间的孤立 * 乘号转 ×（Markdown 会把 a*b 当斜体）；
+            //    循环替换处理 a*b*c 连乘；不影响 **加粗**（其 * 邻接中文/空格不匹配）
+            for (let i = 0; i < 3; i++) {
+                t = t.replace(/([0-9a-zA-Z)\]])\s*\*\s*([0-9a-zA-Z(\[])/g, '$1×$2');
+            }
+            segs[si] = t;
+        }
+        return segs.join('```');
+    }
+
+    // Markdown 渲染（默认信任渲染库输出的结构化标签）
+    // 所有外链（如B站视频）统一新标签页打开，避免学生离开当前学习页面
+    function renderMarkdown(mdText) {
+        // 残留保存标记清洗：新回复的标记块后端已剥离，这里兜底处理
+        // 流式半截（<<END_SAVE>> 还没到）和历史消息里残留的标记，
+        // 内块整体隐藏（保存的内容不应出现在对话气泡里）
+        const cleaned = String(mdText)
+            .replace(/<<SAVE_CONTENT>>[\s\S]*?(?:<<END_SAVE>>|$)/g, '')
+            .replace(/^\s*SAVE_FILE\s*[:：][^\n]*$/gm, '');
+        const container = document.createElement('div');
+        container.innerHTML = marked.parse(normalizeMathSymbols(cleaned), { breaks: true });
+        container.querySelectorAll('a[href]').forEach(a => {
+            if (a.getAttribute('href').startsWith('#')) return;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+        });
+        return container.innerHTML;
+    }
+
+    function scrollToBottom() {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    /* ======================================================
+       右侧面板：知识点补充 + 推荐视频
+    ======================================================= */
+    // 渲染知识点：后端已探测好词条链接（百度百科有词条 → 直达词条页；
+    // 无词条 → 必应站内搜百科词条，保证有结果），按 source 显示来源角标
+    function renderKnowledge(items) {
+        knBadge.textContent = items.length;
+        knowledgeList.innerHTML = items.map((k, i) => {
+            const tag = k.source === '百科搜索' ? '搜索 ↗' : '百科 ↗';
+            return `<a class="kn-chip" href="${escapeHtml(k.url)}" target="_blank" rel="noopener noreferrer" title="在${escapeHtml(k.source || '百度百科')}查看「${escapeHtml(k.name)}」"><span class="kn-idx">${i + 1}</span>${escapeHtml(k.name)}<span class="kn-link-icon">${tag}</span></a>`;
+        }).join('');
+    }
+
+    function renderVideos(videos) {
+        videoBadge.textContent = videos.length;
+        videoList.innerHTML = videos.map(v => `
+            <a class="video-item" href="${escapeHtml(v.url)}" target="_blank" rel="noopener noreferrer">
+                <div class="video-icon">▶️</div>
+                <div class="video-title">${escapeHtml(v.title)}</div>
+            </a>
+        `).join('');
+    }
+
+    /* ======================================================
+       时间分隔线：两次对话间隔超过 10 分钟时插入一条时间提示。
+       显示格式按消息时间与当前时间的差距：
+       当天 → "HH:MM"；昨天 → "昨天 HH:MM"；一周内（2-6 天前）→
+       "周X HH:MM"；同年更早 → "M月D日 HH:MM"；跨年 → "YYYY年M月D日 HH:MM"
+    ======================================================= */
+    let lastMsgTs = null;   // 消息列表里最后一条消息的时间（毫秒），null 表示还没有消息
+
+    function formatDividerTime(d) {
+        const now = new Date();
+        const dayMs = 24 * 3600 * 1000;
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const diffDays = Math.floor((startOfToday - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / dayMs);
+        const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        if (diffDays <= 0) return hm;                                              // 当天：只显示时间
+        if (diffDays === 1) return '昨天 ' + hm;                                   // 昨天
+        if (diffDays <= 6) return '周' + '日一二三四五六'[d.getDay()] + ' ' + hm;  // 一周内
+        if (d.getFullYear() === now.getFullYear())                                 // 同年更早
+            return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hm;
+        return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hm;  // 跨年
+    }
+
+    function maybeInsertDivider(tsMs) {
+        if (lastMsgTs !== null && tsMs - lastMsgTs > 10 * 60 * 1000) {
+            const div = document.createElement('div');
+            div.className = 'time-divider';
+            div.textContent = formatDividerTime(new Date(tsMs));
+            msgList.appendChild(div);
+        }
+        lastMsgTs = tsMs;
+    }
+
+    /* ======================================================
+       消息渲染
+    ======================================================= */
+    function addMessage(role, text, imageDataUrl, tsMs) {
+        // 两次消息间隔 >10 分钟时先插一条时间分隔线（历史消息传落库时间，即时消息用当前时间）
+        maybeInsertDivider(tsMs || Date.now());
+        // 首条消息时隐藏欢迎卡片
+        if (welcomeCard.style.display !== 'none') welcomeCard.style.display = 'none';
+
+        const row = document.createElement('div');
+        row.className = 'msg-row ' + (role === 'user' ? 'user' : 'companion');
+
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        // 用户气泡头像与顶栏一致（emoji 或导入图片）；AI 气泡用温柔女老师形象
+        if (role === 'user') {
+            renderAvatarTo(avatar, currentUser.avatar);
+        } else {
+            avatar.innerHTML = AI_AVATAR_HTML;
+        }
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+
+        if (imageDataUrl) {
+            const img = document.createElement('img');
+            img.className = 'chat-img';
+            img.src = imageDataUrl;
+            bubble.appendChild(img);
+        }
+        if (text) {
+            // 历史消息里的图片以 "[发送了图片: /uploads/xx.png]" 标记存在
+            // 数据库中：渲染时提取标记转回图片缩略图（刷新/重开不丢图）；
+            // 旧记录的纯 "[发送了图片]"（无 URL）不匹配正则，原样显示文字
+            let imgTag = null, displayText = text;
+            const imgMatch = role === 'user' && text.match(/\[发送了图片:\s*(\/uploads\/[^\]\s]+)\]/);
+            if (imgMatch) {
+                displayText = text.replace(/\[发送了图片:\s*\/uploads\/[^\]\s]+\]/, '').trim();
+                imgTag = document.createElement('img');
+                imgTag.className = 'chat-img';
+                imgTag.src = imgMatch[1];
+                bubble.appendChild(imgTag);
+            }
+            const content = document.createElement('div');
+            content.className = 'bubble-content';
+            if (!displayText && imgTag) {
+                // 只有图片没文字：占位空内容，保持气泡布局
+                content.style.display = 'none';
+            } else {
+                content.innerHTML = role === 'user' ? escapeHtml(displayText).replace(/\n/g, '<br>') : renderMarkdown(displayText);
+            }
+            bubble.appendChild(content);
+            // 学伴回复（跳过 ⚠️ 报错提示）挂朗读按钮，点击合成语音播放
+            if (role === 'assistant' && !text.startsWith('> ⚠️')) {
+                const speakBtn = document.createElement('button');
+                speakBtn.className = 'bubble-speak';
+                speakBtn.title = '朗读这条回复';
+                speakBtn.textContent = '🔊 朗读';
+                speakBtn.addEventListener('click', () => speakMessage(text, speakBtn));
+                bubble.appendChild(speakBtn);
+            }
+        }
+
+        row.appendChild(avatar);
+        row.appendChild(bubble);
+        msgList.appendChild(row);
+        scrollToBottom();
+        return bubble;
+    }
+
+    function showTyping() {
+        const row = document.createElement('div');
+        row.className = 'msg-row companion';
+        row.id = 'typingRow';
+        row.innerHTML = '<div class="avatar">' + AI_AVATAR_HTML + '</div><div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+        msgList.appendChild(row);
+        scrollToBottom();
+    }
+
+    function hideTyping() {
+        document.getElementById('typingRow')?.remove();
+    }
+
+    /* ======================================================
+       发送消息（流式 + 可打断）：
+       - 回答走 /api/edu/chat/stream（SSE），打字机效果逐字显示，
+         首字 1-2 秒内出现，不再等整段生成完
+       - 发送按钮双态：回答中变「停止」，点击立即打断
+       - 回答中直接发新问题：自动打断旧回答并立即发送
+       - 打断的那轮后端不落库（回复未完成）；正常完成的轮次
+         done 事件里带最终 Markdown，用于重渲染与收录错题
+    ======================================================= */
+    let activeChatController = null;   // 当前进行中请求的 AbortController
+
+    function setSendBtn(busy) {
+        sendBtn.textContent = busy ? '停止' : '发送';
+        sendBtn.title = busy ? '打断当前回答' : '发送';
+        sendBtn.classList.toggle('stop', busy);
+    }
+
+    /* 打断当前回答（_manual 区分主动打断与超时，提示语不同） */
+    function stopChat() {
+        if (activeChatController) {
+            activeChatController._manual = true;
+            activeChatController.abort();
+        }
+    }
+
+    /* 判断对话区是否滚动到底部附近（流式输出时用户上翻则不强行拉回） */
+    function nearBottom() {
+        return chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 120;
+    }
+
+    async function sendChat(text, imageDataUrl) {
+        if (!text && !imageDataUrl) return;
+
+        // 上一轮还在回答：先打断，等它收尾后立即发新问题
+        if (isSubmitting) stopChat();
+        while (isSubmitting) await new Promise(r => setTimeout(r, 50));
+
+        isSubmitting = true;
+        setSendBtn(true);
+        addMessage('user', text, imageDataUrl);
+        chatHistory.push({
+            role: 'user',
+            text: text || null,
+            image_data_url: imageDataUrl || null,
+        });
+        showTyping();
+
+        let timer = null;
+        let bubble = null, contentEl = null;   // 流式气泡引用（catch 里打断收尾用）
+        try {
+            const controller = new AbortController();
+            activeChatController = controller;
+            // 5 分钟超时：图片轮走视觉模型，生成普遍偏慢，3 分钟不够
+            timer = setTimeout(() => controller.abort(), 300000);
+
+            const resp = await fetch('/api/edu/chat/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    grade_level: userGrade,
+                    username: currentUser.username,
+                    messages: chatHistory.slice(-16),
+                }),
+                signal: controller.signal,
+            });
+
+            if (!resp.ok || !resp.body) {
+                // 建流失败：参数问题 / 服务异常（此时还是普通 JSON 响应）
+                let msg = `请求失败（HTTP ${resp.status}）`;
+                try { const data = await resp.json(); msg = data.error || msg; } catch (_) {}
+                hideTyping();
+                addMessage('assistant', `> ⚠️ ${msg}`);
+                return;
+            }
+
+            // 读取 SSE 流：首个增量到来时把"思考中"换成流式气泡
+            hideTyping();
+            let bubble = null, contentEl = null, acc = '', finalData = null;
+
+            const ensureBubble = () => {
+                if (bubble) return;
+                maybeInsertDivider(Date.now());
+                if (welcomeCard.style.display !== 'none') welcomeCard.style.display = 'none';
+                const row = document.createElement('div');
+                row.className = 'msg-row companion';
+                const avatar = document.createElement('div');
+                avatar.className = 'avatar';
+                avatar.innerHTML = AI_AVATAR_HTML;
+                bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                contentEl = document.createElement('div');
+                contentEl.className = 'bubble-content';
+                bubble.appendChild(contentEl);
+                row.appendChild(avatar);
+                row.appendChild(bubble);
+                msgList.appendChild(row);
+            };
+
+            // 中断收尾标记：给半截回复补一行小字说明（启用 .stop-note 样式）
+            const appendStopNote = (bub, manual) => {
+                if (!bub || bub.querySelector('.stop-note')) return;
+                const note = document.createElement('div');
+                note.className = 'stop-note';
+                note.textContent = manual ? '— 已手动停止 —' : '— 回复中断（连接异常），可重新提问 —';
+                bub.appendChild(note);
+            };
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+                const parts = buf.split('\n\n');
+                buf = parts.pop();
+                for (const part of parts) {
+                    const line = part.trim();
+                    if (!line.startsWith('data:')) continue;
+                    let evt;
+                    try { evt = JSON.parse(line.slice(5)); } catch (_) { continue; }
+                    if (evt.type === 'delta') {
+                        acc += evt.text;
+                        ensureBubble();
+                        // renderMarkdown 入口会清洗 SAVE_FILE/<<SAVE_CONTENT>>
+                        // 标记段，流式期间保存内容不会在气泡里闪现
+                        contentEl.innerHTML = renderMarkdown(acc);
+                        if (nearBottom()) scrollToBottom();
+                    } else if (evt.type === 'done') {
+                        finalData = evt;
+                    } else if (evt.type === 'error') {
+                        acc += (acc ? '\n\n' : '') + `> ⚠️ ${evt.error}`;
+                        ensureBubble();
+                        contentEl.innerHTML = renderMarkdown(acc);
+                        scrollToBottom();
+                    }
+                }
+            }
+
+            // 生成结束：用清洗后的最终 Markdown 重渲染（去掉内部标记），
+            // 挂朗读按钮，收录错题，更新右侧知识点/视频面板
+            if (finalData) {
+                if (!bubble) {
+                    // 整轮没收到任何增量（如模型返回空回复）：也必须展示结果，
+                    // 避免"发了消息却毫无动静"的静默失败
+                    ensureBubble();
+                }
+                contentEl.innerHTML = renderMarkdown(finalData.markdown || '> ⚠️ 本次没有生成内容，请换个问法再试试');
+                const speakBtn = document.createElement('button');
+                speakBtn.className = 'bubble-speak';
+                speakBtn.title = '朗读这条回复';
+                speakBtn.textContent = '🔊 朗读';
+                speakBtn.addEventListener('click', () => speakMessage(finalData.markdown, speakBtn));
+                bubble.appendChild(speakBtn);
+                // 笔记保存结果反馈：模型按学生请求把内容写入了本地文件
+                if (finalData.saved_file) {
+                    const saveNote = document.createElement('div');
+                    saveNote.className = 'save-note' + (finalData.saved_file.saved ? '' : ' failed');
+                    saveNote.textContent = finalData.saved_file.saved
+                        ? `💾 笔记已保存到本地：${finalData.saved_file.path}`
+                        : `⚠️ 笔记保存失败：${finalData.saved_file.error || '未知原因'}`;
+                    bubble.appendChild(saveNote);
+                }
+                chatHistory.push({ role: 'assistant', text: finalData.markdown });
+                saveWrongQuestions(finalData.markdown);
+                if (finalData.knowledge && finalData.knowledge.length) renderKnowledge(finalData.knowledge);
+                if (finalData.videos && finalData.videos.length) renderVideos(finalData.videos);
+                scrollToBottom();
+            } else if (bubble) {
+                // 流正常关闭但没等到 done 事件（服务重启/连接闪断）：
+                // 半截回复保留，补中断标记，避免"说到一半不说话了"
+                appendStopNote(bubble, false);
+            }
+        } catch (err) {
+            hideTyping();
+            if (err.name === 'AbortError' && activeChatController?._manual) {
+                // 手动打断：已生成的部分保留在气泡里，补收尾标记
+                if (bubble) appendStopNote(bubble, true);
+            } else if (bubble) {
+                // 超时/断网等异常中断：半截回复补中断标记
+                appendStopNote(bubble, false);
+            } else {
+                addMessage('assistant', `> ⚠️ ${err.name === 'AbortError' ? '请求超时，请重试或减少题目数量' : '网络错误，请检查服务是否在运行'}`);
+            }
+        } finally {
+            if (timer) clearTimeout(timer);
+            activeChatController = null;
+            isSubmitting = false;
+            setSendBtn(false);
+            chatInput.focus();
+        }
+    }
+
+    function trySend() {
+        const text = chatInput.value.trim();
+        const img = attachDataUrl;
+        if (!text && !img) return;
+        chatInput.value = '';
+        autoGrow();
+        clearAttach();
+        sendChat(text, img);
+    }
+
+    /* ======================================================
+       语音对话（点一下说话模式）：
+       1. 点 🎤 开始录音（按钮红圈脉冲），再点一下结束
+       2. 录音上传 /api/edu/transcribe 识别成文字，填入输入框
+          （孩子确认或修改后再点发送，避免误识别直接发出去）
+       3. 学伴回复旁的 🔊 按钮调用 /api/edu/tts 合成朗读
+    ======================================================= */
+    const DEFAULT_PLACEHOLDER = chatInput.placeholder;
+    const voiceBtn = document.getElementById('voiceBtn');
+    let mediaRecorder = null;
+    let voiceChunks = [];
+    let voiceStream = null;
+
+    function resetVoiceBtn() {
+        voiceBtn.classList.remove('recording');
+        voiceBtn.textContent = '🎤';
+        voiceBtn.title = '点一下开始说话，再点一下结束';
+        chatInput.placeholder = DEFAULT_PLACEHOLDER;
+    }
+
+    voiceBtn.addEventListener('click', async () => {
+        // 正在录音 → 这次点击是"结束"
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            return;
+        }
+        // 开始录音：先请求麦克风权限
+        try {
+            voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err) {
+            addMessage('assistant', '> ⚠️ 用不了麦克风呢～请检查浏览器是否允许使用麦克风，再试一次');
+            return;
+        }
+        try {
+            mediaRecorder = new MediaRecorder(voiceStream);
+        } catch (err) {
+            voiceStream.getTracks().forEach(t => t.stop());
+            voiceStream = null;
+            addMessage('assistant', '> ⚠️ 当前浏览器不支持录音，换 Chrome / Edge 试试吧');
+            return;
+        }
+        voiceChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) voiceChunks.push(e.data); };
+        mediaRecorder.onstop = onRecordingStop;
+        mediaRecorder.start();
+        voiceBtn.classList.add('recording');
+        voiceBtn.title = '正在录音，再点一下结束';
+        chatInput.placeholder = '正在听你说话…讲完再点一下 🎤';
+        chatInput.focus();
+    });
+
+    async function onRecordingStop() {
+        // 无论结果如何先释放麦克风、还原按钮
+        if (voiceStream) {
+            voiceStream.getTracks().forEach(t => t.stop());
+            voiceStream = null;
+        }
+        const mimeType = mediaRecorder ? mediaRecorder.mimeType : '';
+        mediaRecorder = null;
+        resetVoiceBtn();
+
+        const blob = new Blob(voiceChunks, { type: mimeType || 'audio/webm' });
+        voiceChunks = [];
+        // 太短的录音基本没讲到内容，直接忽略（约 <0.3 秒的静音片段）
+        if (blob.size < 2000) return;
+
+        voiceBtn.textContent = '⏳';
+        voiceBtn.title = '正在识别…';
+        try {
+            const ext = ((mimeType.split('/')[1] || 'webm').split(';')[0]) || 'webm';
+            const fd = new FormData();
+            fd.append('file', blob, 'recording.' + ext);
+            const resp = await fetch('/api/edu/transcribe', { method: 'POST', body: fd });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                addMessage('assistant', `> ⚠️ ${data.error || `语音识别失败（HTTP ${resp.status}）`}`);
+                return;
+            }
+            const text = (data.text || '').trim();
+            if (text) {
+                // 识别结果填入输入框，孩子可以改一改再发送
+                chatInput.value = text;
+                autoGrow();
+                chatInput.focus();
+            } else {
+                addMessage('assistant', '> 🤔 没听清你说的话，靠近一点再讲一遍好不好？');
+            }
+        } catch (err) {
+            addMessage('assistant', '> ⚠️ 语音识别出错了，请检查服务是否在运行');
+        } finally {
+            if (!voiceBtn.classList.contains('recording')) {
+                voiceBtn.textContent = '🎤';
+                voiceBtn.title = '点一下开始说话，再点一下结束';
+            }
+        }
+    }
+
+    /* ---------------- 回复朗读（🔊 → 合成 mp3 播放） ---------------- */
+    let currentAudio = null;      // 同时只播一条，新朗读会打断旧的
+    let currentAudioUrl = null;
+    let speakingBtn = null;
+    let speakSeq = 0;             // 朗读会话序号：合成返回时校验防竞态
+
+    function stopSpeaking() {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+        }
+        if (currentAudioUrl) {
+            URL.revokeObjectURL(currentAudioUrl);
+            currentAudioUrl = null;
+        }
+        if (speakingBtn) {
+            speakingBtn.classList.remove('speaking');
+            speakingBtn.textContent = '🔊 朗读';
+            speakingBtn = null;
+        }
+    }
+
+    async function speakMessage(mdText, btn) {
+        // 再点一次正在朗读的按钮 = 停止
+        if (speakingBtn === btn) { stopSpeaking(); return; }
+        stopSpeaking();
+        const seq = ++speakSeq;   // 记下本次会话序号，合成返回时校验防竞态
+        btn.classList.add('speaking');
+        btn.textContent = '⏳ 合成中…';
+        try {
+            const resp = await fetch('/api/edu/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: mdText }),
+            });
+            if (seq !== speakSeq) {
+                // 合成期间用户又点了别的朗读/停止：本条作废，只恢复自己的按钮
+                btn.classList.remove('speaking');
+                btn.textContent = '🔊 朗读';
+                return;
+            }
+            if (!resp.ok) {
+                const data = await resp.json().catch(() => ({}));
+                addMessage('assistant', `> ⚠️ ${data.error || `朗读失败（HTTP ${resp.status}）`}`);
+                btn.classList.remove('speaking');
+                btn.textContent = '🔊 朗读';
+                return;
+            }
+            currentAudioUrl = URL.createObjectURL(await resp.blob());
+            currentAudio = new Audio(currentAudioUrl);
+            speakingBtn = btn;
+            btn.textContent = '⏸️ 停止';
+            currentAudio.onended = currentAudio.onerror = () => {
+                // 只有最新会话的结束事件才清理，防止旧音频的 ended 误停新音频
+                if (seq === speakSeq) stopSpeaking();
+            };
+            await currentAudio.play();
+        } catch (err) {
+            if (seq === speakSeq) {
+                stopSpeaking();
+                addMessage('assistant', '> ⚠️ 朗读出错了，请检查服务是否在运行');
+            }
+        }
+    }
+
+    /* ======================================================
+       学习计划流程：先弹窗选年级和科目，确认后再生成
+    ======================================================= */
+    const planMask = document.getElementById('planMask');
+    const planGrade = document.getElementById('planGrade');
+    const planSubject = document.getElementById('planSubject');
+    const planConfirm = document.getElementById('planConfirm');
+    const planClose = document.getElementById('planClose');
+
+    function fillGradeOptions(selectEl, selected) {
+        selectEl.innerHTML = Object.keys(GRADE_LABELS)
+            .map(g => `<option value="${g}" ${+g === selected ? 'selected' : ''}>${GRADE_LABELS[g]}</option>`)
+            .join('');
+    }
+
+    // 科目下拉随年级联动（白名单与后端一致）
+    function fillSubjectOptions(selectEl, grade) {
+        const subjects = SUBJECTS_BY_GRADE[grade] || SUBJECTS_BY_GRADE[3];
+        selectEl.innerHTML = subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+
+    function openPlanModal() {
+        fillGradeOptions(planGrade, userGrade);
+        fillSubjectOptions(planSubject, userGrade);
+        planMask.classList.add('open');
+    }
+
+    planGrade.addEventListener('change', () => fillSubjectOptions(planSubject, +planGrade.value));
+
+    function closePlanModal() { planMask.classList.remove('open'); }
+    planClose.addEventListener('click', closePlanModal);
+    planMask.addEventListener('click', (e) => { if (e.target === planMask) closePlanModal(); });
+
+    planConfirm.addEventListener('click', () => {
+        const grade = +planGrade.value;
+        const subject = planSubject.value;
+        closePlanModal();
+        // 同步更新全局年级（生成计划所用的年级即当前资料年级的暂态选择）
+        doGeneratePlan(grade, subject);
+    });
+
+    async function doGeneratePlan(grade, subject) {
+        if (isSubmitting) return;
+        addMessage('user', `📅 帮我生成${GRADE_LABELS[grade]}${subject}的周学习计划`);
+        chatHistory.push({ role: 'user', text: `请为${GRADE_LABELS[grade]}学生生成${subject}周学习计划` });
+        isSubmitting = true;
+        setSendBtn(true);
+        showTyping();
+        let timer = null;
+        try {
+            const controller = new AbortController();
+            activeChatController = controller;
+            timer = setTimeout(() => controller.abort(), 300000);
+            const resp = await fetch('/api/edu/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ grade_level: grade, subject: subject, weekly_hours: 6, username: currentUser.username }),
+                signal: controller.signal,
+            });
+            clearTimeout(timer);
+            const data = await resp.json();
+            hideTyping();
+            if (!resp.ok) {
+                addMessage('assistant', `> ⚠️ ${data.error || `生成失败（HTTP ${resp.status}）`}`);
+            } else {
+                const md = `📅 已为${GRADE_LABELS[grade]}同学生成${subject}周学习计划：\n\n${data.markdown}`;
+                addMessage('assistant', md);
+                chatHistory.push({ role: 'assistant', text: md });
+            }
+        } catch (err) {
+            hideTyping();
+            if (err.name === 'AbortError') {
+                if (!activeChatController?._manual) {
+                    addMessage('assistant', '> ⚠️ 生成超时，请重试');
+                }
+            } else {
+                addMessage('assistant', '> ⚠️ 网络错误，请检查服务是否在运行');
+            }
+        } finally {
+            if (timer) clearTimeout(timer);
+            activeChatController = null;
+            isSubmitting = false;
+            setSendBtn(false);
+        }
+    }
+
+    /* ======================================================
+       编辑资料弹窗：点头像打开，可改头像（emoji/本地导入）、昵称、年级
+       账号是登录凭证不可改；昵称首次默认"小同学"
+    ======================================================= */
+    const AVATAR_OPTIONS = ['🧑‍🎓', '👧', '👦', '🐱', '🦊', '🐰', '🐼', '🐸', '🦉', '⭐', '🌈', '🌸'];
+    const userCard = document.getElementById('userCard');
+    const userAvatar = document.getElementById('userAvatar');
+    const profileMask = document.getElementById('profileMask');
+    const avatarGrid = document.getElementById('avatarGrid');
+    const avatarPreview = document.getElementById('avatarPreview');
+    const avatarUploadBtn = document.getElementById('avatarUploadBtn');
+    const avatarFileInput = document.getElementById('avatarFileInput');
+    const profileNickname = document.getElementById('profileNickname');
+    const profileUsername = document.getElementById('profileUsername');
+    const profileGrade = document.getElementById('profileGrade');
+    const profileSave = document.getElementById('profileSave');
+    const profileClose = document.getElementById('profileClose');
+    const profileError = document.getElementById('profileError');
+
+    // 把头像值（emoji 或图片 data URL）渲染到容器
+    function renderAvatarTo(el, avatar) {
+        if (avatar && avatar.startsWith('data:image')) {
+            el.innerHTML = `<img class="avatar-img" src="${avatar}" alt="头像">`;
+        } else {
+            el.textContent = avatar || '🧑‍🎓';
+        }
+    }
+
+    // 当前选中的头像（emoji 或 data URL），保存时提交
+    let selectedAvatar = currentUser.avatar || '🧑‍🎓';
+
+    function renderAvatarGrid() {
+        // 图片头像不在网格中体现，网格只提供 emoji 快捷选择
+        avatarGrid.innerHTML = AVATAR_OPTIONS.map(a =>
+            `<div class="avatar-option ${a === selectedAvatar ? 'selected' : ''}" data-avatar="${a}">${a}</div>`
+        ).join('');
+        renderAvatarTo(avatarPreview, selectedAvatar);
+    }
+
+    avatarGrid.addEventListener('click', (e) => {
+        const opt = e.target.closest('.avatar-option');
+        if (!opt) return;
+        selectedAvatar = opt.dataset.avatar;
+        renderAvatarGrid();
+    });
+
+    // 导入本地图片：读文件 → canvas 压缩到 64x64 JPEG（约几 KB）→ 作为头像
+    avatarUploadBtn.addEventListener('click', () => avatarFileInput.click());
+    avatarFileInput.addEventListener('change', () => {
+        const file = avatarFileInput.files && avatarFileInput.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            profileError.textContent = '请选择图片文件';
+            profileError.style.display = 'block';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                // 压缩：短边居中裁剪后缩放到 64x64，控制存储体积
+                const size = 64;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                const scale = Math.max(size / img.width, size / img.height);
+                const w = img.width * scale;
+                const h = img.height * scale;
+                ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+                selectedAvatar = canvas.toDataURL('image/jpeg', 0.85);
+                renderAvatarGrid();
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+        avatarFileInput.value = '';  // 允许连续选择同一文件
+    });
+
+    userCard.addEventListener('click', () => {
+        profileNickname.value = currentUser.nickname || '小同学';
+        profileUsername.value = currentUser.username;
+        fillGradeOptions(profileGrade, userGrade);
+        selectedAvatar = currentUser.avatar || '🧑‍🎓';
+        renderAvatarGrid();
+        profileError.style.display = 'none';
+        profileMask.classList.add('open');
+    });
+
+    function closeProfileModal() { profileMask.classList.remove('open'); }
+    profileClose.addEventListener('click', closeProfileModal);
+    profileMask.addEventListener('click', (e) => { if (e.target === profileMask) closeProfileModal(); });
+
+    profileSave.addEventListener('click', async () => {
+        const nickname = profileNickname.value.trim() || '小同学';
+        const grade = +profileGrade.value;
+        profileSave.disabled = true;
+        try {
+            const resp = await fetch('/api/auth/profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: currentUser.username,  // 账号定位用户，不可改
+                    nickname: nickname,
+                    grade_level: grade,
+                    avatar: selectedAvatar,
+                }),
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                profileError.textContent = data.error || `保存失败（HTTP ${resp.status}）`;
+                profileError.style.display = 'block';
+                return;
+            }
+            // 同步本地登录态与页面显示
+            userGrade = data.grade_level;
+            currentUser.nickname = data.nickname;
+            currentUser.grade_level = data.grade_level;
+            currentUser.avatar = data.avatar;
+            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+            updateUserMeta();
+            closeProfileModal();
+        } catch (err) {
+            profileError.textContent = '网络错误，请检查服务是否在运行';
+            profileError.style.display = 'block';
+        } finally {
+            profileSave.disabled = false;
+        }
+    });
+
+    /* ======================================================
+       左侧导航
+    ======================================================= */
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            // 高亮当前项
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+
+            const action = item.dataset.nav;
+            switch (action) {
+                case 'chat':      // 对话学习：聚焦输入框
+                    chatInput.focus();
+                    break;
+                case 'grade':     // 作业答疑：选图片 + 填批改引导语
+                    chatInput.value = '请帮我批改这份作业：\n（可以直接粘贴作业图片，或把题目和作答打在这里）';
+                    autoGrow();
+                    fileInput.click();
+                    break;
+                case 'plan':      // 学习计划：弹窗选择年级和科目
+                    openPlanModal();
+                    break;
+                case 'explain':   // 考点精讲
+                    chatInput.value = '请给我讲一个知识点：';
+                    chatInput.focus();
+                    autoGrow();
+                    break;
+                case 'quiz':      // 出题练习
+                    chatInput.value = '请出 5 道题考考我，先不要给答案，我做完后再批改：';
+                    chatInput.focus();
+                    autoGrow();
+                    break;
+                case 'wrong':     // 错题集
+                    openDrawer();
+                    break;
+                case 'local':     // 本地资料：跳转 RAG 知识库管理页
+                    window.location.href = '/rag_admin';
+                    break;
+                case 'focus':     // 专注模式：YOLO 坐姿/注意力监督开关
+                    if (focusCard.classList.contains('open')) {
+                        stopFocusMonitor();
+                    } else {
+                        startFocusMonitor();
+                    }
+                    break;
+            }
+        });
+    });
+
+    /* ======================================================
+       快捷操作
+    ======================================================= */
+    document.querySelectorAll('.quick-chip[data-quick]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const action = chip.dataset.quick;
+            if (action === 'plan') { openPlanModal(); return; }
+
+            // 其余快捷键只是把引导语填进输入框，学生确认后发送
+            const hints = {
+                grade: '请帮我批改这份作业：\n（可以直接粘贴作业图片，或把题目和作答打在这里）',
+                explain: '请给我讲一个知识点：',
+                quiz: '请出 5 道题考考我，先不要给答案，我做完后再批改：',
+            };
+            chatInput.value = hints[action] || '';
+            chatInput.focus();
+            autoGrow();
+        });
+    });
+
+    /* ======================================================
+       图片附件：选择 / 粘贴 / 拖拽
+    ======================================================= */
+    function clearAttach() {
+        attachDataUrl = null;
+        attachPreview.style.display = 'none';
+    }
+
+    attachRemove.addEventListener('click', clearAttach);
+    attachBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        fileInput.value = '';
+        if (file) compressAndAttach(file);
+    });
+
+    // Ctrl+V 粘贴截图
+    document.addEventListener('paste', (e) => {
+        const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+        if (item) {
+            e.preventDefault();
+            compressAndAttach(item.getAsFile());
+        }
+    });
+
+    // 拖拽图片到页面任意位置
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const file = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/'));
+        if (file) compressAndAttach(file);
+    });
+
+    // 压缩后作为附件（长边 1568px + 质量 0.85：题目识别够用，
+    // 体积比 2000px/0.9 缩小约一半，显著降低视觉模型的输入延迟）
+    function compressAndAttach(file) {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const MAX_SIDE = 1568;
+                let { width, height } = img;
+                if (Math.max(width, height) > MAX_SIDE) {
+                    const scale = MAX_SIDE / Math.max(width, height);
+                    width = Math.round(width * scale);
+                    height = Math.round(height * scale);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                attachDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                attachImg.src = attachDataUrl;
+                attachPreview.style.display = 'block';
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    /* ======================================================
+       输入框：自适应高度 + Enter 发送
+    ======================================================= */
+    function autoGrow() {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 130) + 'px';
+    }
+
+    chatInput.addEventListener('input', autoGrow);
+    chatInput.addEventListener('keydown', (e) => {
+        // isComposing：中文输入法选词中的 Enter（确认拼音候选），不能当作发送
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+            e.preventDefault();
+            trySend();
+        }
+    });
+    // 回答期间按钮变「停止」：点击打断当前回答；再发新问题会自动打断旧的
+    sendBtn.addEventListener('click', () => {
+        if (isSubmitting) { stopChat(); return; }
+        trySend();
+    });
+
+    /* ======================================================
+       用户信息卡同步（年级取自注册信息，可在编辑资料弹窗修改）
+    ======================================================= */
+    function updateUserMeta() {
+        // 昵称首次默认"小同学"（旧登录态无 nickname 时也回退到默认值）
+        userName.textContent = currentUser.nickname || '小同学';
+        renderAvatarTo(userAvatar, currentUser.avatar);
+        userMeta.textContent = `${GRADE_LABELS[userGrade]} · ${getCheckinText()}`;
+        // 对话气泡里的用户头像与顶栏同步（修改资料后旧气泡也一起刷新）
+        document.querySelectorAll('.msg-row.user .avatar').forEach(el => renderAvatarTo(el, currentUser.avatar));
+    }
+
+    updateUserMeta();
+
+    /* ======================================================
+       退出登录：清除登录态，回登录页（记住账号不受影响）
+    ======================================================= */
+    logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem(CURRENT_USER_KEY);
+        location.href = '/';
+    });
+
+    /* ======================================================
+       连续打卡（localStorage 记录到访日期，按用户隔离）
+    ======================================================= */
+    const CHECKIN_KEY = `zhiqi_checkin_${currentUser.username}`;
+
+    function updateCheckin() {
+        const today = new Date().toDateString();
+        let rec;
+        try { rec = JSON.parse(localStorage.getItem(CHECKIN_KEY)) || { days: 0, last: null }; }
+        catch { rec = { days: 0, last: null }; }
+
+        if (rec.last !== today) {
+            const yesterday = new Date(Date.now() - 86400000).toDateString();
+            rec.days = rec.last === yesterday ? rec.days + 1 : 1;
+            rec.last = today;
+            localStorage.setItem(CHECKIN_KEY, JSON.stringify(rec));
+        }
+    }
+
+    function getCheckinText() {
+        try {
+            const rec = JSON.parse(localStorage.getItem(CHECKIN_KEY));
+            return rec && rec.days ? `连续打卡 ${rec.days} 天 🌱` : '打卡第 1 天 🌱';
+        } catch {
+            return '打卡第 1 天 🌱';
+        }
+    }
+
+    updateCheckin();
+    updateUserMeta();
+
+    /* ======================================================
+       错题集（云端存储：SQLite wrong_questions 表，跨设备同步）
+       旧版 localStorage 数据在页面加载时自动迁移入库
+    ======================================================= */
+    const WRONG_BOOK_OLD_KEY = `nanoclaw_wrong_book_${currentUser.username}`;
+    // 当前选中的学科 tab（"全部" 或 语文/数学/英语/物理/化学/其他）
+    let currentWrongSubject = '全部';
+    // 分析面板当前展示的学科（切换 tab 时若学科变了就隐藏旧分析）
+    let analysisShownSubject = null;
+
+    // epoch 秒 → "M月D日 HH:MM" 展示文案（与服务端收录时间对应）
+    function fmtWrongTime(ts) {
+        const d = new Date(ts * 1000);
+        return `${d.getMonth() + 1}月${d.getDate()}日 ` +
+            `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    // 旧版 localStorage 错题一次性迁移到云端（成功后移除本地键；
+    // 网络异常时保留本地数据，下次打开页面再试）
+    async function migrateLocalWrongBook() {
+        let old;
+        try { old = JSON.parse(localStorage.getItem(WRONG_BOOK_OLD_KEY)); } catch { old = null; }
+        if (!Array.isArray(old) || !old.length) return;
+        // 旧数据最新在前，反转成时间正序入库，云端展示时自然最新在前
+        const items = old.reverse()
+            .filter(it => it && it.question && it.markdown)
+            .map(it => ({ question: it.question, verdict: it.verdict || '❌ 错误', markdown: it.markdown }));
+        if (!items.length) {
+            localStorage.removeItem(WRONG_BOOK_OLD_KEY);
+            return;
+        }
+        try {
+            const resp = await fetch('/api/edu/wrongbook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser.username, items }),
+            });
+            // 入库成功才清本地键，失败时保留数据下次再试
+            if (resp.ok) localStorage.removeItem(WRONG_BOOK_OLD_KEY);
+            else console.warn('错题迁移失败：HTTP ' + resp.status);
+        } catch (err) {
+            console.warn('错题迁移网络异常：', err);
+        }
+    }
+    migrateLocalWrongBook();
+
+    /* --------------------------------------------------
+       从学伴回复中提取错题/未作答块。
+       兼容 "**第 N 题**" 标题行 与 "**题目**：" 行两种分块格式，
+       判定按 ❌/⛔ emoji 识别（与后端批改 prompt 的输出约定对齐）。
+    --------------------------------------------------- */
+    function extractWrongItems(mdText) {
+        const items = [];
+        const blocks = mdText.split(/\n(?=\*\*(?:第\s*\d+\s*题|题目))/);
+        for (const block of blocks) {
+            if (!/^\*\*(第\s*\d+\s*题|题目)/.test(block)) continue;
+
+            // 优先在"判定"之后找状态标记，避免题干内容干扰
+            const judgePart = block.includes('判定') ? block.split('判定')[1] : block;
+            let verdict = null;
+            if (judgePart.includes('⛔')) verdict = '⛔ 未作答';
+            else if (judgePart.includes('❌')) verdict = '❌ 错误';
+            if (!verdict) continue;
+
+            // 题目摘要：优先取 "题目：xxx" 行，否则取标题后的第一行实质内容
+            let question = '';
+            const qMatch = block.match(/题\s*目\s*\*{0,2}\s*[:：]\s*(.+)/);
+            if (qMatch) {
+                question = qMatch[1].trim();
+            } else {
+                const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+                const first = lines.find(l => !/^\*\*第\s*\d+\s*题\*\*$/.test(l) && !/^\*\*判定\*\*/.test(l)) || '';
+                question = first.replace(/\*\*/g, '').replace(/^(题目|题)\s*[:：]?/, '').slice(0, 60);
+            }
+
+            items.push({
+                question: question || '未知题目',
+                verdict: verdict,
+                markdown: block.trim(),
+            });
+        }
+        return items;
+    }
+
+    function saveWrongQuestions(mdText) {
+        const items = extractWrongItems(mdText);
+        if (!items.length) return;
+
+        // 整批提交云端入库，收录时间由服务端统一生成
+        fetch('/api/edu/wrongbook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: currentUser.username,
+                items: items.map(it => ({
+                    question: it.question,
+                    verdict: it.verdict,
+                    markdown: it.markdown,
+                })),
+            }),
+        })
+            .then(resp => {
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                // 新错题涌入：抽屉开着就实时刷新；旧分析基于旧数据，一并收起
+                if (drawer.classList.contains('open')) {
+                    wrongAnalysisPanel.hidden = true;
+                    renderWrongBook();
+                }
+            })
+            .catch(err => console.warn('错题收录失败：', err)); // 失败不打断对话
+    }
+
+    async function renderWrongBook() {
+        let items = [];
+        try {
+            const resp = await fetch(
+                `/api/edu/wrongbook?username=${encodeURIComponent(currentUser.username)}` +
+                (currentWrongSubject === '全部' ? '' : `&subject=${encodeURIComponent(currentWrongSubject)}`)
+            );
+            if (resp.ok) items = (await resp.json()).items || [];
+        } catch (err) {
+            console.warn('错题列表拉取失败：', err);
+        }
+
+        if (!items.length) {
+            wrongBookList.innerHTML = `<div class="wrong-empty">${
+                currentWrongSubject === '全部'
+                    ? '错题集还是空的，发作业图片让知契批改吧'
+                    : `${currentWrongSubject}分类下还没有错题`
+            }</div>`;
+            return;
+        }
+        wrongBookList.innerHTML = items.map(item => `
+            <details class="wrong-entry">
+                <summary>
+                    <span class="wrong-verdict">${item.verdict}</span>
+                    <span class="wrong-subject-tag">${escapeHtml(item.subject || '其他')}</span>
+                    <span class="wrong-question">${escapeHtml(item.question)}</span>
+                    <span class="wrong-time">${fmtWrongTime(item.time)}</span>
+                    <button class="btn-ghost" data-del-id="${item.id}">删除</button>
+                </summary>
+                <div class="bubble-content">${renderMarkdown(item.markdown)}</div>
+            </details>
+        `).join('');
+    }
+
+    // 学科 tab 切换：更新选中态、隐藏旧学科的分析、按学科重新拉取列表
+    wrongTabs.addEventListener('click', (e) => {
+        const tab = e.target.closest('.wrong-tab:not(.wrong-analysis-btn)');
+        if (!tab) return;
+        if (tab.dataset.subject === currentWrongSubject) return;
+        currentWrongSubject = tab.dataset.subject;
+        wrongTabs.querySelectorAll('.wrong-tab').forEach(t =>
+            t.classList.toggle('active', t === tab)
+        );
+        // 学科变了，旧分析不再适用，收起面板（"全部"分析只在"全部"下展示）
+        if (analysisShownSubject !== currentWrongSubject) {
+            wrongAnalysisPanel.hidden = true;
+        }
+        renderWrongBook();
+    });
+
+    // 📊 分析按钮：按当前学科请求薄弱点分析（后端有缓存，数据没变时秒回）
+    wrongAnalysisBtn.addEventListener('click', async () => {
+        if (wrongAnalysisBtn.disabled) return;
+        wrongAnalysisBtn.disabled = true;
+        wrongAnalysisPanel.hidden = false;
+        wrongAnalysisPanel.classList.add('loading');
+        wrongAnalysisPanel.classList.remove('error');
+        wrongAnalysisPanel.innerHTML = `正在分析「${currentWrongSubject}」错题，稍等一下…`;
+        try {
+            const resp = await fetch(
+                `/api/edu/wrongbook/analysis?username=${encodeURIComponent(currentUser.username)}` +
+                `&subject=${encodeURIComponent(currentWrongSubject)}`
+            );
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) throw new Error(data.error || 'HTTP ' + resp.status);
+            analysisShownSubject = currentWrongSubject;
+            wrongAnalysisPanel.classList.remove('loading');
+            wrongAnalysisPanel.innerHTML = renderMarkdown(data.analysis);
+        } catch (err) {
+            wrongAnalysisPanel.classList.remove('loading');
+            wrongAnalysisPanel.classList.add('error');
+            wrongAnalysisPanel.textContent = '分析失败了：' + err.message + '，稍后再试试吧';
+        } finally {
+            wrongAnalysisBtn.disabled = false;
+        }
+    });
+
+    // 删除单条（阻止冒泡到 summary 触发折叠；旧分析基于旧数据，一并收起）
+    wrongBookList.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-del-id]');
+        if (!btn) return;
+        e.preventDefault();
+        fetch(
+            `/api/edu/wrongbook/${btn.dataset.delId}?username=${encodeURIComponent(currentUser.username)}`,
+            { method: 'DELETE' }
+        )
+            .then(() => {
+                wrongAnalysisPanel.hidden = true;
+                renderWrongBook();
+            })
+            .catch(err => console.warn('错题删除失败：', err));
+    });
+
+    clearWrongBtn.addEventListener('click', async () => {
+        if (!confirm('确定要清空错题集吗？')) return;
+        try {
+            await fetch(
+                `/api/edu/wrongbook?username=${encodeURIComponent(currentUser.username)}`,
+                { method: 'DELETE' }
+            );
+        } catch (err) {
+            console.warn('错题清空失败：', err);
+        }
+        wrongAnalysisPanel.hidden = true;
+        renderWrongBook();
+    });
+
+    // 抽屉开关
+    function openDrawer() {
+        renderWrongBook();
+        drawer.classList.add('open');
+        drawerMask.classList.add('open');
+    }
+
+    function closeDrawer() {
+        drawer.classList.remove('open');
+        drawerMask.classList.remove('open');
+    }
+
+    drawerClose.addEventListener('click', closeDrawer);
+    drawerMask.addEventListener('click', closeDrawer);
+
+    /* ======================================================
+       专注模式：YOLO 坐姿/注意力监督（摄像头画面不展示，纯后端检测）
+       点侧边栏「专注模式」开启/关闭；开启期间每 5 秒轮询一次
+       /api/edu/focus/status，新提醒弹进聊天区并调用 /api/edu/tts
+       合成语音直接播报给学生（语音失败时以文字提醒兜底）
+    ======================================================= */
+    let focusTimer = null;          // 轮询定时器
+    let focusLastEventTs = 0;       // 已播报过的提醒事件时间戳（避免重复提醒）
+    let alertSpeakSeq = 0;          // 语音提醒序号（新提醒作废旧合成结果）
+
+    function focusRunningUI(on) {
+        focusCard.classList.toggle('open', on);
+    }
+
+    /* 提醒语音播报：打断当前朗读，优先播报监督提醒；失败静默（文字兜底） */
+    async function speakAlert(text) {
+        const seq = ++alertSpeakSeq;
+        try {
+            const resp = await fetch('/api/edu/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text }),
+            });
+            if (!resp.ok || seq !== alertSpeakSeq) return;
+            const url = URL.createObjectURL(await resp.blob());
+            if (seq !== alertSpeakSeq) { URL.revokeObjectURL(url); return; }
+            stopSpeaking();
+            currentAudioUrl = url;
+            currentAudio = new Audio(url);
+            currentAudio.onended = currentAudio.onerror = stopSpeaking;
+            await currentAudio.play();
+        } catch (err) { /* 语音合成/播放失败静默，文字提醒已在聊天区 */ }
+    }
+
+    async function startFocusMonitor() {
+        try {
+            const resp = await fetch('/api/edu/focus/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser.username }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                addMessage('assistant', `⚠️ 专注监督开启失败：${data.error || '未知错误'}`);
+                scrollToBottom();
+                return;
+            }
+            focusLastEventTs = Date.now() / 1000;  // 旧提醒只进状态卡，不再回放成消息
+            focusRunningUI(true);
+            addMessage('assistant', '🎯 **专注监督已开启**\\n\\n我会在后台悄悄观察你的坐姿和注意力（不会展示画面，请放心）：\\n- 低头认真学习时不会打扰你\\n- 检测到分神、坐姿问题或离开座位会用语音直接提醒你\\n- 再点一次「专注模式」或卡片上的「结束」可随时停止');
+            scrollToBottom();
+            if (focusTimer) clearInterval(focusTimer);
+            focusTimer = setInterval(pollFocusStatus, 5000);
+            pollFocusStatus();  // 立即拉一次状态
+        } catch (err) {
+            addMessage('assistant', '⚠️ 专注监督开启失败：无法连接服务器');
+            scrollToBottom();
+        }
+    }
+
+    async function stopFocusMonitor() {
+        if (!focusCard.classList.contains('open')) return;  // 未开启时忽略重复调用
+        if (focusTimer) { clearInterval(focusTimer); focusTimer = null; }
+        focusRunningUI(false);
+        try {
+            const resp = await fetch('/api/edu/focus/stop', { method: 'POST' });
+            const data = await resp.json();
+            addMessage('assistant', `🛑 **专注监督已结束**\n\n本次共检测 ${data.rounds ?? 0} 轮，发出 ${data.alert_count ?? 0} 次提醒。学累了就休息一下吧！`);
+            scrollToBottom();
+        } catch (err) { /* 网络失败也照常收起状态卡 */ }
+    }
+
+    async function pollFocusStatus() {
+        try {
+            const resp = await fetch('/api/edu/focus/status');
+            if (!resp.ok) return;
+            const st = await resp.json();
+            if (!st.running) { stopFocusMonitor(); return; }
+
+            if (st.last_error) {
+                focusInfo.innerHTML = `<span style="color:var(--danger)">⚠️ ${escapeHtml(st.last_error)}</span>`;
+                return;
+            }
+            const l = st.latest;
+            if (l) {
+                const good = l.focus && l.focus.includes('注意力集中');
+                focusInfo.innerHTML =
+                    `坐姿：<b>${escapeHtml(l.posture || '—')}</b><br>` +
+                    `注意力：<b style="color:${good ? '#22c55e' : 'var(--accent)'}">${escapeHtml(l.focus || '—')}</b>`;
+                focusMeta.textContent =
+                    `已检测 ${st.rounds} 轮 · 提醒 ${st.alert_count} 次 · 最近 ${new Date(l.ts * 1000).toLocaleTimeString()}`;
+            }
+            // 新提醒 → 弹进聊天区 + 语音直接播报（同一轮多条只播最新一条，避免刷屏）
+            let hasNew = false, latestMsg = '';
+            (st.events || []).forEach(ev => {
+                if (ev.ts > focusLastEventTs) {
+                    addMessage('assistant', `⏰ **${escapeHtml(ev.time)}** ${escapeHtml(ev.message)}`);
+                    focusLastEventTs = ev.ts;
+                    hasNew = true;
+                    latestMsg = ev.message;
+                }
+            });
+            if (hasNew) {
+                scrollToBottom();
+                speakAlert(latestMsg);
+            }
+        } catch (err) { /* 单次轮询失败静默，下轮继续 */ }
+    }
+
+    focusStopBtn.addEventListener('click', stopFocusMonitor);
+
+    /* ======================================================
+       初始化
+    ======================================================= */
+    renderWrongBook();
+    chatInput.focus();
+
+    // 页面重开时若服务端监督仍在进行（如上次页面被直接关闭），重新接管状态卡
+    (async function resumeFocusMonitor() {
+        try {
+            const resp = await fetch('/api/edu/focus/status');
+            if (!resp.ok) return;
+            const st = await resp.json();
+            if (st.running) {
+                focusRunningUI(true);
+                focusLastEventTs = Date.now() / 1000;
+                if (focusTimer) clearInterval(focusTimer);
+                focusTimer = setInterval(pollFocusStatus, 5000);
+            }
+        } catch (err) { /* 忽略 */ }
+    })();
+
+    /* ======================================================
+       历史恢复：页面重开后从服务器拉取本账号的学伴聊天记录
+       （SQLite 持久化在服务端，cookie 定位会话；最多回放最近 50 条）
+    ======================================================= */
+    (async function loadHistoryFromServer() {
+        try {
+            const resp = await fetch('/api/edu/history?username=' + encodeURIComponent(currentUser.username));
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data.messages || !data.messages.length) return;
+            // 全量渲染历史（早期只显示最近 50 条，更早的记录数据库里有但页面看不到；
+            // 现量级下全量渲染无压力，未来会话数千条时可改为上滑分页加载）
+            for (const msg of data.messages) {
+                addMessage(msg.role === 'user' ? 'user' : 'assistant', msg.content, null, msg.ts ? msg.ts * 1000 : Date.now());
+                chatHistory.push({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    text: msg.content,
+                    image_data_url: null,
+                });
+            }
+        } catch (err) { /* 历史加载失败不阻塞新对话 */ }
+    })();
+    } else {
+        // 未登录：跳回登录页（replace 不留历史）
+        location.replace('/');
+    }
+</script>
+
+</body>
+</html>

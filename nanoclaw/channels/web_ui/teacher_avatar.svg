@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 知契 AI 对话形象：温柔女老师（扁平卡通，粉蓝渐变背景与页面风格一致） -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fde3ef"/>
+      <stop offset="1" stop-color="#dceefe"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a08066"/>
+      <stop offset="1" stop-color="#7d5f4c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆形渐变背景 -->
+  <circle cx="64" cy="64" r="64" fill="url(#bg)"/>
+
+  <!-- 后层长发（垂到肩后） -->
+  <path d="M22 72 Q19 30 64 28 Q109 30 106 72 L106 102 Q94 112 64 112 Q34 112 22 102 Z" fill="url(#hair)"/>
+
+  <!-- 淡紫开衫 -->
+  <path d="M30 118 Q36 96 64 96 Q92 96 98 118 L98 128 L30 128 Z" fill="#b7a4e3"/>
+  <!-- 白衬衫领 -->
+  <path d="M52 99 L64 113 L76 99 Q70 95 64 95 Q58 95 52 99 Z" fill="#ffffff"/>
+
+  <!-- 脖子 -->
+  <rect x="57" y="84" width="14" height="14" rx="6" fill="#f7cfae"/>
+
+  <!-- 脸 -->
+  <circle cx="64" cy="58" r="30" fill="#ffe3cf"/>
+
+  <!-- 刘海（覆盖额头） -->
+  <path d="M34 58 Q31 26 64 25 Q97 26 94 58 Q89 37 64 37 Q39 37 34 58 Z" fill="url(#hair)"/>
+  <!-- 两侧鬓发 -->
+  <path d="M34 56 Q32 66 36 74 Q38 64 40 58 Z" fill="url(#hair)"/>
+  <path d="M94 56 Q96 66 92 74 Q90 64 88 58 Z" fill="url(#hair)"/>
+
+  <!-- 温柔弯弯笑眼（向上拱的弧线） -->
+  <path d="M48 62 q5 -5 10 0" stroke="#5d4a44" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M70 62 q5 -5 10 0" stroke="#5d4a44" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+
+  <!-- 腮红 -->
+  <ellipse cx="45" cy="69" rx="5.5" ry="3.2" fill="#f8a8b8" opacity="0.55"/>
+  <ellipse cx="83" cy="69" rx="5.5" ry="3.2" fill="#f8a8b8" opacity="0.55"/>
+
+  <!-- 微笑小嘴 -->
+  <path d="M59 72 q5 4.5 10 0" stroke="#d96c7a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+
+  <!-- 粉色小发夹 -->
+  <circle cx="88" cy="33" r="3.2" fill="#f48fb1"/>
+  <circle cx="94" cy="37" r="2.4" fill="#f8bbd0"/>
+</svg>

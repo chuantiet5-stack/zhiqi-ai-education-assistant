@@ -1,0 +1,41 @@
+# Local credentials and configuration
+config.json
+config - *.json
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies, editor settings and runtime data
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.claude/
+workspace/
+workspac/
+logs/
+*.log*
+*.db
+*.db-*
+*.sqlite*
+**/data/*
+!**/data/README.md
+!**/data/*.example.json
+
+# Presentation files, videos and archives
+*.ppt
+*.pptx
+*.mp4
+*.mov
+*.avi
+*.webm
+*.zip
+*.rar
+*.7z

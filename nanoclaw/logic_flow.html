@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NanoClaw 代码逻辑运行图</title>
+
+<!-- Mermaid 渲染库：BootCDN 国内可达；加载失败时降级显示图形源码 -->
+<script src="https://cdn.bootcdn.net/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+        background: #0f1420;
+        color: #d8dee9;
+        line-height: 1.7;
+    }
+
+    header {
+        padding: 32px 24px 20px;
+        text-align: center;
+        border-bottom: 1px solid #2a3245;
+    }
+    header h1 { font-size: 26px; color: #7fb2ff; }
+    header p { color: #8a93a6; margin-top: 6px; font-size: 14px; }
+
+    nav {
+        position: sticky; top: 0; z-index: 10;
+        background: #131a2b; border-bottom: 1px solid #2a3245;
+        padding: 10px 16px; text-align: center;
+    }
+    nav a {
+        color: #9fb4d8; text-decoration: none; margin: 0 10px; font-size: 14px;
+    }
+    nav a:hover { color: #7fb2ff; }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
+
+    section { margin-bottom: 48px; }
+    h2 {
+        font-size: 20px; color: #ffd479; margin-bottom: 6px;
+        border-left: 4px solid #ffd479; padding-left: 10px;
+    }
+    .desc { color: #8a93a6; font-size: 14px; margin-bottom: 16px; }
+
+    .card {
+        background: #161e30; border: 1px solid #2a3245; border-radius: 10px;
+        padding: 20px; overflow-x: auto;
+    }
+
+    /* Mermaid 容器居中 */
+    .mermaid { display: flex; justify-content: center; }
+
+    /* 图源码降级显示 */
+    pre.src {
+        background: #0d1220; border-radius: 8px; padding: 14px;
+        font-family: Consolas, monospace; font-size: 12px;
+        color: #6f7d99; white-space: pre-wrap; display: none;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid #2a3245; padding: 8px 12px; text-align: left; }
+    th { background: #1b2438; color: #7fb2ff; }
+    td code { background: #0d1220; padding: 2px 6px; border-radius: 4px; color: #9ee493; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>NanoClaw 代码逻辑运行图</h1>
+    <p>多渠道智能体：飞书 / QQ / 终端 / Web → 消息总线 → 网关 → AgentLoop → 工具/LLM</p>
+</header>
+
+<nav>
+    <a href="#s1">模块结构</a>
+    <a href="#s2">全流程总图</a>
+    <a href="#s3">启动流程</a>
+    <a href="#s4">消息路由</a>
+    <a href="#s5">Agent 循环</a>
+    <a href="#s6">四渠道时序</a>
+    <a href="#s7">端到端时序</a>
+    <a href="#s8">数据落盘</a>
+</nav>
+
+<main>
+
+<!-- ============ 1. 模块结构 ============ -->
+<section id="s1">
+    <h2>1. 项目模块结构</h2>
+    <p class="desc">各目录与文件的职责分工。</p>
+    <div class="card"><pre>nanoclaw/
+├── main.py                  # 入口：工作目录固定、编码兜底、启动配置/MCP/渠道/网关
+├── config.py                # 读取 config.json
+├── gateway.py               # 网关：消息路由、会话级并发调度
+├── bus/queue.py             # 消息总线（入站/出站异步队列）
+├── channels/                # 渠道适配层
+│   ├── base.py              #   渠道抽象基类
+│   ├── cli.py               #   终端渠道（stdin）
+│   ├── feishu.py            #   飞书渠道（lark WebSocket，子线程投递）
+│   ├── qq.py                #   QQ 渠道（botpy，原生异步）
+│   └── web.py               #   Web 渠道（FastAPI + WebSocket）
+├── agent/
+│   ├── loop.py              # AgentLoop：LLM 多轮推理 + 工具调用
+│   ├── context.py           # 组装 System Prompt（人设/时间/记忆/技能）
+│   ├── memory.py            # Token 估算 + 历史压缩
+│   ├── skills.py            # 技能（SKILL.md）加载器
+│   └── tools/               # 工具层
+│       ├── base.py          #   工具抽象基类
+│       ├── registry.py      #   工具注册表（异常兜底）
+│       ├── filesystem.py    #   读写文件/列目录（workspace 边界防穿越）
+│       ├── shell.py         #   执行命令
+│       ├── web_search.py    #   Bing 搜索
+│       ├── web_fetch.py     #   网页抓取
+│       ├── spawn.py         #   子 Agent
+│       └── mcp_server.py    #   MCP 客户端管理 + MCP 工具包装
+├── providers/
+│   ├── base.py              # LLM Provider 抽象
+│   └── openai_compat.py     # OpenAI 兼容 API（硅基流动）
+├── session/manager.py       # 会话历史持久化（jsonl）
+├── mcp_servers/poetry_server.py  # 自建 MCP：古诗词服务
+├── skills/                  # 技能定义（weather / translator / code_review）
+└── workspace/               # 运行时数据（会话记录、长期记忆）</pre></div>
+</section>
+
+<!-- ============ 2. 全流程总图 ============ -->
+<section id="s2">
+    <h2>2. 全流程总图</h2>
+    <p class="desc">从启动到退出的完整逻辑：启动 → 消息链路 → Agent 内部 → 支撑系统 → 退出。</p>
+    <div class="card">
+        <pre class="mermaid">
+flowchart TB
+    START(["python main.py"]) --> INIT
+    subgraph INIT["启动阶段 main.py"]
+        I1["os.chdir 固定工作目录<br/>stdout 重配置 UTF-8"] --> I2["load_config 读 config.json"]
+        I2 --> I3["创建 MessageBus"]
+        I3 --> I4{"config.mcp_servers?"}
+        I4 -->|是| I5["MCPClientManager.connect_all<br/>启动 poetry 子进程"]
+        I4 -->|否| I6
+        I5 --> I6["组装四渠道<br/>CLI/飞书/QQ/Web"]
+        I6 --> I7["创建 Gateway<br/>预创建 cli agent"]
+    end
+    I7 --> RUN
+    subgraph RUN["运行阶段 gateway.py"]
+        R1["channel.start ×4"] --- R2["_process_inbound"] --- R3["_dispatch_outbound"] --- R4["_session_worker ×N"]
+    end
+    RUN --> MSG
+    subgraph MSG["一条消息的旅程"]
+        M1["渠道收到消息"] --> M2["bus 入站队列"]
+        M2 --> M3["session_key = channel:sender_id"]
+        M3 --> M4{"该会话有 worker?"}
+        M4 -->|否| M5["创建队列 + worker"]
+        M4 -->|是| M6["消息入该会话队列<br/>同会话串行 跨会话并发"]
+        M5 --> M6 --> M7["_handle_message"]
+    end
+    M7 --> AGENT
+    subgraph AGENT["Agent 内部 loop.py"]
+        A1["加载会话历史"] --> A2["组装 System Prompt<br/>人设+时间+记忆+技能"]
+        A2 --> A3{"超 Token 预算?"}
+        A3 -->|是| A4["压缩旧消息为摘要"]
+        A3 -->|否| A5
+        A4 --> A5["调用 LLM"]
+        A5 --> A6{"响应类型"}
+        A6 -->|tool_calls| A7["执行工具"]
+        A7 --> A8["结果追加 继续循环"]
+        A8 --> A5
+        A6 -->|纯文本| A10["保存并返回"]
+    end
+    AGENT --> REPLY
+    subgraph REPLY["回复与落盘"]
+        P1["bus 出站队列"] --> P2["按 channel 名路由"]
+        P2 --> P3["渠道 send() 回复用户"]
+        P3 --> P4["保存消息 jsonl"]
+    end
+    RUN -.->|Ctrl+C| EXIT
+    subgraph EXIT["退出阶段"]
+        E1["KeyboardInterrupt"] --> E2["取消全部任务"] --> E3["MCP shutdown"] --> E4["os._exit 强杀残留线程"]
+    end
+        </pre>
+        <pre class="src">渲染失败时的图形源码见 COMPLETE_LOGIC_FLOW.md / CODE_FLOW.md</pre>
+    </div>
+</section>
+
+<!-- ============ 3. 启动流程 ============ -->
+<section id="s3">
+    <h2>3. 启动流程</h2>
+    <p class="desc">main.py 的初始化顺序。</p>
+    <div class="card">
+        <pre class="mermaid">
+flowchart TD
+    A["python main.py"] --> B["os.chdir 固定工作目录<br/>stdout 重配置 UTF-8"]
+    B --> C["asyncio.run async_main"]
+    C --> D["load_config 读取 config.json"]
+    D --> E["创建 MessageBus"]
+    E --> F{"config.mcp_servers?"}
+    F -->|有| G["MCPClientManager.connect_all<br/>连接 poetry / filesystem"]
+    F -->|无| H["跳过"]
+    G --> I["注册渠道"]
+    H --> I
+    I --> I1["CLIChannel 始终启用"]
+    I --> I2["FeishuChannel 配置了 app_id"]
+    I --> I3["QQChannel 配置了 app_id"]
+    I --> I4["WebChannel 默认启用 :8080"]
+    I1 & I2 & I3 & I4 --> J["Gateway 启动<br/>预创建 cli agent"]
+    J --> K["gateway.run 并发运行所有任务"]
+        </pre>
+    </div>
+</section>
+
+<!-- ============ 4. 消息路由 ============ -->
+<section id="s4">
+    <h2>4. Gateway 消息路由</h2>
+    <p class="desc">四渠道共用总线；同会话串行保序，跨会话并发防阻塞。</p>
+    <div class="card">
+        <pre class="mermaid">
+flowchart LR
+    subgraph CH["渠道接入"]
+        CLI["CLI stdin"]
+        FS["飞书 WebSocket<br/>子线程投递"]
+        QQ["QQ botpy 事件"]
+        WEB["浏览器 WebSocket"]
+    end
+    subgraph GW["Gateway"]
+        BUS_IN[("bus 入站队列")]
+        INB["_process_inbound<br/>按 session_key 分发"]
+        Q1["队列 web:client1"]
+        Q2["队列 feishu:ou_x"]
+        Q3["队列 qq:xxx"]
+        W1["_session_worker"]
+        W2["_session_worker"]
+        W3["_session_worker"]
+        HM["_handle_message<br/>agent.run"]
+        BUS_OUT[("bus 出站队列")]
+        DISP["_dispatch_outbound<br/>按 channel 名路由"]
+    end
+    CLI & FS & QQ & WEB --> BUS_IN
+    BUS_IN --> INB
+    INB --> Q1 --> W1
+    INB --> Q2 --> W2
+    INB --> Q3 --> W3
+    W1 & W2 & W3 --> HM --> BUS_OUT
+    BUS_OUT --> DISP
+    DISP -->|web| WEB
+    DISP -->|feishu| FS
+    DISP -->|qq| QQ
+    DISP -->|cli| CLI
+        </pre>
+    </div>
+</section>
+
+<!-- ============ 5. Agent 循环 ============ -->
+<section id="s5">
+    <h2>5. AgentLoop 核心循环</h2>
+    <p class="desc">LLM 多轮推理 + 工具调用 + Token 压缩。</p>
+    <div class="card">
+        <pre class="mermaid">
+flowchart TD
+    S["收到用户消息"] --> H["SessionManager 加载历史<br/>追加用户消息并保存"]
+    H --> CTX["ContextBuilder.build_messages<br/>人设 identity.md + 当前时间<br/>+ workspace 路径 + MEMORY.md<br/>+ 技能摘要 + 历史 + 当前消息"]
+    CTX --> CHK{"历史超 Token 预算?"}
+    CHK -->|是| COM["MemoryConsolidator<br/>压缩旧消息为摘要<br/>写入 HISTORY.md"]
+    CHK -->|否| LOOP
+    COM --> LOOP["provider.chat<br/>调用 LLM 携带工具定义"]
+    LOOP --> RES{"返回内容?"}
+    RES -->|纯文本| OUT["保存助手消息<br/>返回给渠道"]
+    RES -->|tool_calls| EXE["ToolRegistry.execute<br/>read_file / write_file / list_dir<br/>exec / web_search / web_fetch<br/>spawn_subagent / MCP 工具"]
+    EXE --> APP["工具结果追加为 tool 消息"]
+    APP --> CHK2{"达 max_iterations?"}
+    CHK2 -->|否| CHK
+    CHK2 -->|是| OUT
+        </pre>
+    </div>
+</section>
+
+<!-- ============ 6. 四渠道时序 ============ -->
+<section id="s6">
+    <h2>6. 四渠道收发时序</h2>
+    <p class="desc">核心下游完全共用，区别只在接入层。</p>
+
+    <div class="card">
+        <h3 style="color:#7fb2ff;margin-bottom:10px">飞书：子线程回调 → 投回主循环 → 同步 API 回复</h3>
+        <pre class="mermaid">
+sequenceDiagram
+    participant U as 用户(飞书App)
+    participant SDK as lark ws.Client(子线程)
+    participant MAIN as 主事件循环
+    participant GW as Gateway
+    participant AG as Agent
+    participant API as 飞书 OpenAPI
+    U->>SDK: 发消息(经飞书服务器WS推送)
+    SDK->>SDK: _on_message 解析
+    SDK->>MAIN: run_coroutine_threadsafe 投递
+    MAIN->>GW: consume_inbound
+    GW->>AG: agent.run(text)
+    AG-->>GW: 回复
+    GW->>SDK: send() 空内容保护+重试1次
+    SDK->>API: im.v1.message.create(to_thread)
+    API->>U: 回复送达
+        </pre>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+        <h3 style="color:#7fb2ff;margin-bottom:10px">QQ：botpy 原生异步，链路最短</h3>
+        <pre class="mermaid">
+sequenceDiagram
+    participant U as 用户(QQ)
+    participant B as botpy.Client(主循环)
+    participant GW as Gateway
+    participant AG as Agent
+    participant API as QQ OpenAPI
+    U->>B: @机器人/私聊(平台WS推送)
+    B->>GW: await publish_inbound
+    GW->>AG: agent.run(content)
+    AG-->>GW: 回复
+    GW->>B: send()
+    B->>API: 先发 C2C 消息
+    alt C2C 失败
+        B->>API: 回退发群消息
+    end
+    API->>U: 回复送达
+        </pre>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+        <h3 style="color:#7fb2ff;margin-bottom:10px">终端：input 阻塞在 to_thread，print 回复</h3>
+        <pre class="mermaid">
+sequenceDiagram
+    participant U as 用户
+    participant C as CLIChannel
+    participant GW as Gateway
+    participant AG as Agent
+    U->>C: 键盘输入
+    C->>C: input() 在 to_thread<br/>本地命令 /exit /clear /tools
+    C->>GW: publish_inbound(cli:local)
+    GW->>AG: agent.run(text)
+    AG-->>GW: 回复
+    GW->>C: send()
+    C->>U: print 回复
+        </pre>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+        <h3 style="color:#7fb2ff;margin-bottom:10px">Web：每标签页独立 uuid 会话</h3>
+        <pre class="mermaid">
+sequenceDiagram
+    participant B as 浏览器
+    participant S as FastAPI(主循环)
+    participant GW as Gateway
+    participant AG as Agent
+    B->>S: GET / 请求页面
+    S->>B: 返回 index.html
+    B->>S: WS 连接 /ws
+    S->>B: 分配 uuid 会话 web:{uuid} + 欢迎
+    loop 对话
+        B->>S: {"type":"chat","content":"..."}
+        S->>GW: publish_inbound
+        GW->>AG: agent.run
+        AG-->>GW: 回复(Markdown)
+        GW->>S: 按 chat_id 找 ws
+        S->>B: send_text
+        B->>B: marked 渲染 + hljs 高亮
+    end
+        </pre>
+    </div>
+</section>
+
+<!-- ============ 7. 端到端时序 ============ -->
+<section id="s7">
+    <h2>7. 端到端完整时序（内部组件视角）</h2>
+    <p class="desc">任何渠道只有首尾两步不同，中间全走同一条管道。</p>
+    <div class="card">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant C as 渠道层
+    participant B as MessageBus
+    participant G as Gateway
+    participant S as SessionManager
+    participant X as ContextBuilder
+    participant L as LLM(硅基流动)
+    participant T as 工具/MCP
+    participant M as MemoryConsolidator
+    U->>C: 发消息
+    C->>B: publish_inbound
+    B->>G: consume_inbound → 会话队列
+    G->>S: 加载会话历史
+    G->>M: 历史超预算? 压缩为摘要
+    G->>X: 组装 messages
+    G->>L: chat(messages, tools)
+    loop 最多 max_iterations 轮
+        L-->>G: tool_calls
+        G->>T: 执行工具(异常兜底)
+        T-->>G: 工具结果
+        G->>L: 带结果继续
+    end
+    L-->>G: 最终文本
+    G->>S: 保存消息 jsonl
+    G->>B: publish_outbound
+    B->>C: 按 channel 名路由
+    C->>U: 回复送达
+        </pre>
+    </div>
+</section>
+
+<!-- ============ 8. 数据落盘 ============ -->
+<section id="s8">
+    <h2>8. 数据落盘一览</h2>
+    <div class="card">
+        <table>
+            <tr><th>数据</th><th>位置</th><th>写入时机</th></tr>
+            <tr><td>会话历史</td><td><code>workspace/sessions/{channel}:{sender}.jsonl</code></td><td>每条用户/助手消息</td></tr>
+            <tr><td>长期记忆</td><td><code>workspace/memory/MEMORY.md</code></td><td>Agent 调用 write_file 更新</td></tr>
+            <tr><td>压缩摘要</td><td><code>workspace/memory/HISTORY.md</code></td><td>Token 超预算触发压缩时</td></tr>
+            <tr><td>QQ SDK 日志</td><td><code>botpy.log*</code></td><td>botpy 自动滚动</td></tr>
+        </table>
+    </div>
+</section>
+
+</main>
+
+<script>
+    // Mermaid 加载成功才渲染；失败则显示降级提示
+    if (window.mermaid) {
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                fontFamily: '"Microsoft YaHei", sans-serif',
+                fontSize: '14px'
+            },
+            flowchart: { curve: 'basis' },
+            securityLevel: 'loose'
+        });
+    } else {
+        document.querySelectorAll('.mermaid').forEach(function (el) {
+            el.outerHTML = '<pre class="src" style="display:block">⚠ Mermaid 库加载失败（需联网访问 BootCDN）。' +
+                '图形源码见项目内 CODE_FLOW.md / CHANNELS_FLOW.md / COMPLETE_LOGIC_FLOW.md</pre>';
+        });
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG 知识库管理 · 知契</title>
+    <!-- 品牌图标 favicon（与登录页/学伴页同源） -->
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <style>
+        /* ============ 主题变量（与 edu.html 学伴页面的浅色粉蓝风格一致） ============ */
+        :root {
+            --bg-primary: #eef5fd;
+            --bg-secondary: rgba(255, 255, 255, 0.9);
+            --bg-tertiary: #f7fbff;
+            --bg-input: #ffffff;
+            --border-subtle: rgba(242, 143, 177, 0.25);
+            --border-input: rgba(111, 192, 245, 0.45);
+            --text-primary: #4a5382;
+            --text-secondary: #8b93b8;
+            --text-muted: #b8bfd8;
+            --accent: #f27ba9;
+            --accent-hover: #ee5f98;
+            --accent-blue: #6fc0f5;
+            --danger: #ef5350;
+            --success: #2e9e5b;
+            --scrollbar: rgba(242, 143, 177, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #e3f2fd 0%, #fdf0f5 55%, #fce4ec 100%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        /* ============ 顶栏（返回 + 粉蓝渐变标题，与学伴页 logo 同款） ============ */
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 14px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 18px;
+            box-shadow: 0 4px 18px rgba(242, 143, 177, 0.1);
+        }
+
+        .back-link {
+            color: var(--text-secondary);
+            font-size: 13px;
+            text-decoration: none;
+            padding: 6px 12px;
+            border: 1px solid var(--border-input);
+            border-radius: 20px;
+            background: #ffffff;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .back-link:hover { color: #ffffff; background: var(--accent); border-color: var(--accent); }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f27ba9, #6fc0f5);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-sub { color: var(--text-muted); font-size: 13px; font-weight: normal; margin-left: 12px; }
+
+        /* ============ 卡片区块（与学伴页 card 同款：白底粉边大圆角） ============ */
+        .section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 18px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 18px rgba(242, 143, 177, 0.1);
+        }
+
+        .section h2 {
+            font-size: 16px;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section h2 .badge {
+            font-size: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-weight: normal;
+        }
+
+        .row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .col { flex: 1; min-width: 260px; }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        textarea, input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-input);
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: border 0.2s;
+        }
+
+        textarea::placeholder, input::placeholder { color: var(--text-muted); }
+
+        textarea:focus, input:focus { border-color: var(--accent); outline: none; }
+
+        textarea { height: 140px; resize: vertical; font-family: inherit; }
+
+        /* ============ 按钮（与发送按钮同款粉蓝渐变 / 描边危险与成功） ============ */
+        .btn {
+            padding: 9px 20px;
+            background: linear-gradient(135deg, #f27ba9, #6fc0f5);
+            color: #ffffff;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 3px 10px rgba(242, 143, 177, 0.35);
+            transition: all 0.15s;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(242, 143, 177, 0.45);
+        }
+
+        .btn-danger {
+            background: rgba(239, 83, 80, 0.1);
+            color: #e53935;
+            border: 1px solid rgba(239, 83, 80, 0.4);
+            box-shadow: none;
+        }
+
+        .btn-danger:hover { background: rgba(239, 83, 80, 0.2); }
+
+        .btn-success {
+            background: rgba(46, 158, 91, 0.12);
+            color: #2e9e5b;
+            border: 1px solid rgba(46, 158, 91, 0.4);
+            box-shadow: none;
+        }
+
+        .btn-success:hover { background: rgba(46, 158, 91, 0.22); }
+
+        .btn-sm { padding: 5px 14px; font-size: 13px; }
+
+        .flex { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .flex-grow { flex: 1; }
+
+        /* ============ 状态条 ============ */
+        .status {
+            margin: 0 0 20px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .status.success { background: rgba(46, 158, 91, 0.08); border-color: rgba(46, 158, 91, 0.35); color: #2e9e5b; }
+        .status.error { background: rgba(239, 83, 80, 0.08); border-color: rgba(239, 83, 80, 0.35); color: #e53935; }
+        .status.info { background: rgba(242, 123, 169, 0.08); border-color: rgba(242, 123, 169, 0.35); color: var(--accent-hover); }
+
+        /* ============ 文档列表 ============ */
+        .result-list { margin-top: 12px; max-height: 500px; overflow-y: auto; }
+
+        .doc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .doc-item:last-child { border-bottom: none; }
+
+        .doc-item .name { font-weight: 500; color: var(--text-primary); }
+        .doc-item .count { color: var(--text-muted); font-size: 13px; }
+
+        /* 文档名可点击预览 */
+        .doc-item .name.doc-name {
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+
+        .doc-item .name.doc-name:hover { color: var(--accent-hover); text-decoration: underline; }
+
+        /* ============ 文档预览弹窗 ============ */
+        .modal-mask {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(80, 60, 90, 0.35);
+            backdrop-filter: blur(3px);
+            z-index: 60;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-mask.open { display: flex; }
+
+        .modal {
+            width: 760px;
+            max-width: 94vw;
+            max-height: 84vh;
+            background: #ffffff;
+            border: 1px solid var(--border-subtle);
+            border-radius: 18px;
+            box-shadow: 0 12px 40px rgba(80, 60, 90, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--bg-tertiary);
+            flex-shrink: 0;
+        }
+
+        .modal-head h3 {
+            font-size: 15px;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        .modal-meta {
+            padding: 10px 20px 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .modal-body {
+            padding: 12px 20px 20px;
+            overflow-y: auto;
+        }
+
+        .preview-text {
+            font-size: 13.5px;
+            line-height: 1.85;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .stat-box {
+            display: inline-block;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-input);
+            padding: 5px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .stat-box strong { color: var(--accent-hover); }
+
+        .hint { color: var(--text-secondary); font-size: 13px; margin-left: 8px; }
+
+        /* ============ 拖放区 ============ */
+        .drop-zone {
+            border: 2px dashed rgba(242, 143, 177, 0.45);
+            border-radius: 14px;
+            padding: 22px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.6);
+            transition: all 0.2s;
+        }
+
+        .drop-zone:hover { border-color: var(--accent); color: var(--accent-hover); }
+
+        .drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(242, 123, 169, 0.08);
+            color: var(--accent-hover);
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .section { padding: 16px; }
+        }
+
+        /* ============ 本地检索测试 ============ */
+        .search-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .search-row input[type="text"] { flex: 1; min-width: 220px; }
+
+        .upload-line {
+            padding: 6px 10px; border-radius: 8px; margin-top: 6px;
+            font-size: 13px; border: 1px solid transparent;
+        }
+        .upload-line.ok { background: rgba(46, 158, 91, 0.08); color: #2e9e5b; }
+        .upload-line.fail { background: rgba(239, 83, 80, 0.08); color: #e53935; }
+
+        .search-row select {
+            padding: 9px 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-input);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .search-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+        }
+
+        .search-item-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .search-src {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-hover);
+        }
+
+        .search-score {
+            font-size: 12px;
+            color: var(--accent-hover);
+            background: rgba(242, 123, 169, 0.08);
+            border: 1px solid rgba(242, 123, 169, 0.3);
+            border-radius: 10px;
+            padding: 1px 10px;
+        }
+
+        .search-content {
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .answer-box {
+            background: rgba(111, 192, 245, 0.1);
+            border: 1px solid rgba(111, 192, 245, 0.4);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+
+        .answer-box .answer-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #3a9ad9;
+            margin-bottom: 8px;
+        }
+
+        .answer-box .answer-body {
+            font-size: 14px;
+            line-height: 1.8;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="topbar">
+        <a class="back-link" href="/edu">← 返回学伴</a>
+        <h1>📚 RAG 知识库管理</h1>
+        <span class="header-sub">知契 · 本地教材资料</span>
+    </div>
+
+    <!-- 状态 -->
+    <div id="status" class="status info">初始化中...</div>
+
+    <!-- 统计 -->
+    <div class="section">
+        <h2>📊 概览</h2>
+        <div id="stats" class="flex">
+            <span class="stat-box">总块数: <strong id="totalChunks">0</strong></span>
+            <span class="stat-box">文档来源: <strong id="totalSources">0</strong></span>
+        </div>
+    </div>
+
+    <!-- 文档列表 -->
+    <div class="section">
+        <h2>📖 已导入教材 <span class="badge" id="sourceCount">0 个来源</span></h2>
+        <div class="flex" style="margin-bottom:12px;">
+            <button class="btn" onclick="listDocuments()">🔄 刷新</button>
+            <button class="btn btn-danger" onclick="clearAll()">🗑️ 清空全部</button>
+            <span class="hint">共 <span id="docTotal">0</span> 个块</span>
+        </div>
+        <div id="docList" class="result-list">
+            <p class="hint">暂无数据，请添加教材</p>
+        </div>
+    </div>
+
+    <!-- 手动添加 -->
+    <div class="section">
+        <h2>✏️ 手动添加教材</h2>
+        <div class="row">
+            <div class="col">
+                <label>来源名称</label>
+                <input type="text" id="manualSource" placeholder="如：math/chapter_01.md 或 人教版数学">
+            </div>
+            <div class="col">
+                <label>学科（可选）</label>
+                <input type="text" id="manualSubject" placeholder="如：数学、物理、英语">
+            </div>
+        </div>
+        <div id="dropZone" class="drop-zone">
+            📁 将教材文件拖到这里导入，或点击选择文件<br>
+            <span style="font-size:12px; color:var(--text-muted);">支持 PDF / Word / PPT / Excel / TXT / MD / CSV / HTML / JPG·PNG（图片OCR）</span>
+        </div>
+        <input type="file" id="fileInput" accept=".txt,.md,.markdown,.csv,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.html,.htm,.jpg,.jpeg,.png,.bmp,.webp" multiple style="display:none;">
+        <div id="uploadResults"></div>
+        <textarea id="manualContent" placeholder="粘贴教材内容（支持 Markdown 格式）..."></textarea>
+        <button class="btn btn-success" onclick="addManual()">📥 添加到知识库</button>
+    </div>
+
+    <!-- 本地检索测试 -->
+    <div class="section">
+        <h2>🔎 本地检索测试</h2>
+        <div class="search-row">
+            <input type="text" id="searchQuery" placeholder="输入问题或关键词，如：一元二次方程的判别式" onkeydown="if(event.key==='Enter')doRetrieve()">
+            <select id="searchTopK">
+                <option value="1">Top 1</option>
+                <option value="3" selected>Top 3</option>
+                <option value="5">Top 5</option>
+                <option value="8">Top 8</option>
+            </select>
+            <button class="btn" onclick="doRetrieve()">🔍 检索</button>
+            <button class="btn btn-success" onclick="doAsk()">🤖 AI 问答</button>
+        </div>
+        <div id="searchResults">
+            <p class="hint">输入问题后点「检索」可测试知识库召回效果；点「AI 问答」由模型基于检索到的教材片段作答。</p>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 文档预览弹窗 ============ -->
+<div class="modal-mask" id="previewMask">
+    <div class="modal">
+        <div class="modal-head">
+            <h3 id="previewTitle">📄 文档预览</h3>
+            <button class="btn btn-sm" id="previewClose">✕ 关闭</button>
+        </div>
+        <div class="modal-meta" id="previewMeta"></div>
+        <div class="modal-body" id="previewBody"></div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = '/api/rag';
+
+    async function apiCall(path, method = 'GET', data = null) {
+        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        if (data) opts.body = JSON.stringify(data);
+        const res = await fetch(API_BASE + path, opts);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: '请求失败' }));
+            throw new Error(err.error || err.detail || `HTTP ${res.status}`);
+        }
+        return res.json();
+    }
+
+    function showStatus(msg, type = 'info') {
+        const el = document.getElementById('status');
+        el.textContent = msg;
+        el.className = 'status ' + type;
+    }
+
+    // 文档列表
+    let _docs = [];
+
+    async function listDocuments() {
+        try {
+            const data = await apiCall('/documents');
+            const container = document.getElementById('docList');
+            const totalEl = document.getElementById('docTotal');
+            const countEl = document.getElementById('sourceCount');
+
+            _docs = data.documents || [];
+            totalEl.textContent = data.total_chunks || 0;
+            countEl.textContent = _docs.length + ' 个来源';
+
+            if (_docs.length === 0) {
+                container.innerHTML = '<p class="hint">暂无数据，请添加教材</p>';
+            } else {
+                container.innerHTML = _docs.map((d, i) => `
+                    <div class="doc-item">
+                        <span class="name doc-name" title="点击预览内容" onclick="previewSource(${i})">📄 ${d.source}</span>
+                        <span class="flex" style="gap:12px;">
+                            <span class="count">${d.chunk_count} 块</span>
+                            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteSource(${i})">🗑️ 删除</button>
+                        </span>
+                    </div>`).join('');
+            }
+
+            document.getElementById('totalChunks').textContent = data.total_chunks || 0;
+            document.getElementById('totalSources').textContent = _docs.length;
+            showStatus(`加载成功，共 ${data.total_chunks || 0} 个块`, 'success');
+        } catch (e) {
+            showStatus('加载文档失败: ' + e.message, 'error');
+        }
+    }
+
+    async function deleteSource(idx) {
+        const d = _docs[idx];
+        if (!d) return;
+        if (!confirm(`确定删除「${d.source}」吗？将移除 ${d.chunk_count} 个块。`)) return;
+        try {
+            const data = await apiCall('/delete', 'POST', { source: d.source });
+            showStatus(`✅ ${data.message}`, 'success');
+            listDocuments();
+        } catch (e) {
+            showStatus('删除失败: ' + e.message, 'error');
+        }
+    }
+
+    // ============ 文档内容预览 ============
+    const previewMask = document.getElementById('previewMask');
+    const previewBody = document.getElementById('previewBody');
+
+    async function previewSource(idx) {
+        const d = _docs[idx];
+        if (!d) return;
+        document.getElementById('previewTitle').textContent = '📄 ' + d.source;
+        document.getElementById('previewMeta').textContent = `共 ${d.chunk_count} 个内容块`;
+        previewBody.innerHTML = '<p class="hint">加载中…</p>';
+        previewMask.classList.add('open');
+        try {
+            const data = await apiCall('/document?source=' + encodeURIComponent(d.source));
+            const text = data.full_text || '';
+            if (!text.trim()) {
+                previewBody.innerHTML = '<p class="hint">该文档没有可预览的内容</p>';
+                return;
+            }
+            previewBody.innerHTML = `<div class="preview-text">${escapeHtml(text)}</div>`;
+        } catch (e) {
+            previewBody.innerHTML = `<p class="hint">预览加载失败：${escapeHtml(e.message)}</p>`;
+        }
+    }
+
+    function closePreview() { previewMask.classList.remove('open'); }
+
+    document.getElementById('previewClose').addEventListener('click', closePreview);
+    // 点击遮罩空白处关闭（点击弹窗本身不关）
+    previewMask.addEventListener('click', e => {
+        if (e.target === previewMask) closePreview();
+    });
+    // Esc 键关闭
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && previewMask.classList.contains('open')) closePreview();
+    });
+
+    async function addManual() {
+        const content = document.getElementById('manualContent').value.trim();
+        if (!content) { alert('请输入教材内容'); return; }
+
+        const source = document.getElementById('manualSource').value.trim() || 'manual_' + Date.now();
+        const subject = document.getElementById('manualSubject').value.trim();
+
+        try {
+            const data = await apiCall('/add', 'POST', {
+                content,
+                source,
+                metadata: { source, subject }
+            });
+            showStatus(`添加成功！新增 ${data.added || 0} 个块`, 'success');
+            document.getElementById('manualContent').value = '';
+            document.getElementById('manualSource').value = '';
+            document.getElementById('manualSubject').value = '';
+            listDocuments();
+        } catch (e) {
+            showStatus('添加失败: ' + e.message, 'error');
+        }
+    }
+
+    function initDropZone() {
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            handleFiles(fileInput.files);
+            fileInput.value = '';
+        });
+
+        ['dragenter', 'dragover'].forEach(ev =>
+            dropZone.addEventListener(ev, e => {
+                e.preventDefault(); e.stopPropagation();
+                dropZone.classList.add('dragover');
+            })
+        );
+        ['dragleave', 'drop'].forEach(ev =>
+            dropZone.addEventListener(ev, e => {
+                e.preventDefault(); e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            })
+        );
+        dropZone.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+    }
+
+    // 前端扩展名预检（真正的解析与报错由服务端完成）
+    const UPLOAD_ACCEPT = /\.(txt|md|markdown|csv|pdf|docx?|pptx?|xlsx?|html?|jpe?g|png|bmp|webp)$/i;
+
+    async function handleFiles(files) {
+        if (!files || files.length === 0) return;
+        const list = Array.from(files);
+        const skipped = list.filter(f => !UPLOAD_ACCEPT.test(f.name));
+        const uploading = list.filter(f => UPLOAD_ACCEPT.test(f.name));
+        const container = document.getElementById('uploadResults');
+
+        if (skipped.length) {
+            showStatus(`跳过不支持的格式：${skipped.map(f => f.name).join('、')}`, 'error');
+        }
+        if (!uploading.length) return;
+
+        container.innerHTML = '<p class="hint">⏳ 上传解析中…（PDF / 图片 OCR 可能较慢，请稍候）</p>';
+        const subject = document.getElementById('manualSubject').value.trim();
+        const fd = new FormData();
+        uploading.forEach(f => fd.append('files', f));
+        if (subject) fd.append('subject', subject);
+
+        try {
+            const res = await fetch(API_BASE + '/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+            const results = data.results || [];
+            container.innerHTML = results.map(r => r.ok
+                ? `<div class="upload-line ok">✅ ${escapeHtml(r.filename)}：解析 ${r.chars} 字，新增 ${r.added} 块</div>`
+                : `<div class="upload-line fail">❌ ${escapeHtml(r.filename)}：${escapeHtml(r.error || '解析失败')}</div>`
+            ).join('');
+            const okCount = results.filter(r => r.ok).length;
+            showStatus(`上传完成：${okCount}/${results.length} 个文件导入成功`, okCount ? 'success' : 'error');
+            listDocuments();
+        } catch (e) {
+            container.innerHTML = '';
+            showStatus('上传失败: ' + e.message, 'error');
+        }
+    }
+
+    async function clearAll() {
+        if (!confirm('⚠️ 确定要清空所有知识库数据吗？此操作不可恢复！')) return;
+        try {
+            await apiCall('/clear', 'DELETE');
+            showStatus('已清空所有数据', 'success');
+            listDocuments();
+        } catch (e) {
+            showStatus('清空失败: ' + e.message, 'error');
+        }
+    }
+
+    // ============ 本地检索测试 ============
+    function escapeHtml(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    async function doRetrieve() {
+        const query = document.getElementById('searchQuery').value.trim();
+        if (!query) { showStatus('请输入检索内容', 'error'); return; }
+        const topK = parseInt(document.getElementById('searchTopK').value, 10);
+        const container = document.getElementById('searchResults');
+        container.innerHTML = '<p class="hint">检索中…</p>';
+        try {
+            const data = await apiCall('/retrieve', 'POST', { query, top_k: topK });
+            renderResults(data.results || []);
+        } catch (e) {
+            container.innerHTML = '';
+            showStatus('检索失败: ' + e.message, 'error');
+        }
+    }
+
+    function renderResults(results) {
+        const container = document.getElementById('searchResults');
+        if (!results.length) {
+            container.innerHTML = '<p class="hint">没有找到相关内容（可尝试降低阈值，或先在上方导入教材）</p>';
+            return;
+        }
+        container.innerHTML = results.map(r => `
+            <div class="search-item">
+                <div class="search-item-head">
+                    <span class="search-src">📄 ${escapeHtml(r.source)}</span>
+                    <span class="search-score">相似度 ${(r.score ?? 0).toFixed(4)}</span>
+                </div>
+                <div class="search-content">${escapeHtml(r.content)}</div>
+            </div>`).join('');
+        showStatus(`检索完成，命中 ${results.length} 个片段`, 'success');
+    }
+
+    async function doAsk() {
+        const query = document.getElementById('searchQuery').value.trim();
+        if (!query) { showStatus('请输入问题', 'error'); return; }
+        const topK = parseInt(document.getElementById('searchTopK').value, 10);
+        const container = document.getElementById('searchResults');
+        container.innerHTML = '<p class="hint">正在检索教材并生成回答…</p>';
+        try {
+            const data = await apiCall('/ask', 'POST', { query, top_k: topK });
+            const sources = (data.sources || [])
+                .map(s => `<span class="search-src">📄 ${escapeHtml(s.source)}</span>`)
+                .join(' ');
+            container.innerHTML = `
+                <div class="answer-box">
+                    <div class="answer-title">🤖 基于教材的回答</div>
+                    <div class="answer-body">${escapeHtml(data.answer || '')}</div>
+                </div>
+                ${sources ? `<div class="search-item-head">${sources}</div>` : ''}
+                <p class="hint">以上回答依据知识库中的教材片段生成。</p>`;
+            showStatus('问答完成', 'success');
+        } catch (e) {
+            container.innerHTML = '';
+            showStatus('问答失败: ' + e.message, 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        initDropZone();
+        await listDocuments();
+        showStatus('就绪，可开始管理知识库', 'info');
+    });
+</script>
+</body>
+</html>
