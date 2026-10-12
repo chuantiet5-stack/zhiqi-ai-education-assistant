@@ -2,7 +2,7 @@
 
 ## 模型接口
 
-从 `nanoclaw/config.example.json` 创建同目录的 `config.json`。
+从 `src/nanoclaw/config.example.json` 创建同目录的 `config.json`。
 
 | 字段 | 用途 |
 | --- | --- |
@@ -37,7 +37,7 @@
 ## 本地视觉与学习记录
 
 - 专注监控使用运行服务设备的摄像头，需要可用的 OpenCV 与 Ultralytics 环境。
-- 本地模型位于 `nanoclaw/models/yolov8n-pose.pt`。
+- 本地模型位于 `src/nanoclaw/models/yolov8n-pose.pt`。
 - 关键点分析反映坐姿及注意力的启发式判断，需要结合摄像头位置与实际场景解释。
 - SQLite 保存本地用户、会话与学习记录；首次使用需注册账号。
 - 家长报告模块依赖本地账号绑定与学习记录，飞书推送需要相应渠道配置。

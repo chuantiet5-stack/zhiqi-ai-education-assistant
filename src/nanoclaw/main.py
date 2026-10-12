@@ -26,7 +26,7 @@ _os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 # DEFAULT_FILE_HANDLER），import 之后再 chdir 无法改变它的落点，导致
 # botpy.log 散落在启动目录（如项目外层）。提前 chdir 让 botpy.log、
 # workspace、config.json 等所有相对路径一律落在 main.py 所在目录，
-# 无论从哪里启动（python nanoclaw/main.py 也一样）。
+# 无论从哪里启动（python src/nanoclaw/main.py 也一样）。
 _os.chdir(_os.path.dirname(_os.path.abspath(__file__)))
 
 import asyncio

@@ -24,27 +24,27 @@ source .venv/bin/activate
 
 ## 依赖与能力
 
-`nanoclaw/requirements.txt` 列出 Web、模型、RAG、数据库及视觉依赖。专注监控还需要可访问的本地摄像头；外部模型、Embedding、视频搜索与飞书依赖对应服务可用。
+`src/nanoclaw/requirements.txt` 列出 Web、模型、RAG、数据库及视觉依赖。专注监控还需要可访问的本地摄像头；外部模型、Embedding、视频搜索与飞书依赖对应服务可用。
 
 ## 代码阅读入口
 
 | 路径 | 职责 |
 | --- | --- |
-| `nanoclaw/main.py` | 模型、工具、教育服务与渠道组装 |
-| `nanoclaw/edu_service.py` | 学习对话、作业与计划业务 |
-| `nanoclaw/agent/edu_loop.py` | 教育 Agent 执行循环 |
-| `nanoclaw/agent/rag/` | 教材解析、Embedding 与检索 |
-| `nanoclaw/agent/tools/yolo_vision.py` | 姿态关键点与视觉工具 |
-| `nanoclaw/focus_monitor.py` | 采样、窗口统计与提醒 |
-| `nanoclaw/parent_report.py` | 家长绑定、摘要与推送 |
-| `nanoclaw/session/persistent_memory.py` | SQLite 会话记忆 |
+| `src/nanoclaw/main.py` | 模型、工具、教育服务与渠道组装 |
+| `src/nanoclaw/edu_service.py` | 学习对话、作业与计划业务 |
+| `src/nanoclaw/agent/edu_loop.py` | 教育 Agent 执行循环 |
+| `src/nanoclaw/agent/rag/` | 教材解析、Embedding 与检索 |
+| `src/nanoclaw/agent/tools/yolo_vision.py` | 姿态关键点与视觉工具 |
+| `src/nanoclaw/focus_monitor.py` | 采样、窗口统计与提醒 |
+| `src/nanoclaw/parent_report.py` | 家长绑定、摘要与推送 |
+| `src/nanoclaw/session/persistent_memory.py` | SQLite 会话记忆 |
 
 ## 语法检查
 
 在仓库根目录执行：
 
 ```bash
-python -m compileall -q nanoclaw
+python -m compileall -q src run.py
 ```
 
 该命令只检查 Python 源码编译，不代表联网功能或业务流程已经通过。当前仓库没有独立的 `tests/` 测试套件。
@@ -58,3 +58,4 @@ python -m compileall -q nanoclaw
 5. 配置家长绑定和飞书后，检查学习摘要与报告推送。
 
 后续自动化测试可优先覆盖文档分块、检索结果过滤、会话归属和报告材料组装。涉及外部服务的验证使用独立测试账号与测试数据。
+
