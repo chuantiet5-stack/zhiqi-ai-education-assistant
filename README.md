@@ -1,41 +1,111 @@
-# 知契 · 智能教育助手
+# Zhiqi · 知契智能教育助手
 
-基于 NanoClaw Agent 的智能教育助手，包含教育对话、教材 RAG 检索、教学视频与古诗词工具、专注监控和家长报告等模块。
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![RAG](https://img.shields.io/badge/RAG-FAISS-5B5BD6)
+![Vision](https://img.shields.io/badge/Vision-YOLO_Pose-00A67E)
 
-## 功能与技术栈
+结合教育 Agent、教材检索和本地视觉分析的学习辅助应用。覆盖学习对话、作业批改、学习计划与自习陪学，并提供学习记录和家长报告模块。
 
-- 教育 Agent 与多模态模型接口支持学习对话、作业批改和学习计划。
-- 教材解析与 FAISS 向量检索为学习问答提供 RAG 上下文。
-- 集成教学视频搜索与古诗词 MCP 工具。
-- YOLO 姿态推理用于专注监控，并提供家长报告模块。
-- 技术栈：Python、NanoClaw Agent、FastAPI、OpenAI 兼容模型接口、FAISS、MCP、SQLite、YOLO/OpenCV。
+[功能特性](#功能特性) · [系统架构](#系统架构) · [快速开始](#快速开始) · [配置指南](docs/configuration.md) · [开发指南](docs/development.md)
 
-## 项目结构
+## 功能特性
 
-- `nanoclaw/agent/`：Agent、教育工具与 RAG 检索。
-- `nanoclaw/channels/`：Web 与飞书渠道及页面资源。
-- `nanoclaw/mcp_servers/`：古诗词 MCP 服务。
-- `nanoclaw/models/`：交付版本随附的 YOLO 姿态模型。
-- `nanoclaw/db/`：本地 SQLite 持久层。
+| 模块 | 功能 |
+| --- | --- |
+| 学习助手 | 学习问答、多模态作业批改与学习计划 |
+| 教材检索 | 文档解析、分块、Embedding 与 FAISS 相似度检索 |
+| 教学工具 | B 站教学视频搜索、古诗词 MCP 服务 |
+| 专注监控 | 基于 YOLO Pose 关键点分析坐姿与注意力状态 |
+| 学习记录 | 用户、会话、聊天与学习数据的 SQLite 持久化 |
+| 家长报告 | 账号绑定、学习摘要与报告推送模块 |
+| 交互界面 | Web 学习工作台、知识库管理与飞书渠道 |
 
-## 本地启动
+## 系统架构
 
-在 Python 虚拟环境中执行：
+```mermaid
+flowchart LR
+    User[学习者] --> Web[Web 学习工作台]
+    Web --> Education[教育服务与 Agent]
+    Education <--> LLM[文本 / 视觉模型接口]
+    Education --> RAG[教材解析与向量检索]
+    RAG --> Index[(FAISS 索引)]
+    Education --> Tools[视频搜索 / 古诗词 MCP]
+    Education --> Vision[本地 YOLO Pose 监控]
+    Education --> DB[(SQLite 学习与会话数据)]
+    Parent[家长 / 飞书] --> Report[绑定与学习报告]
+    Report --> DB
+    Report <--> LLM
+```
 
-```powershell
-cd nanoclaw
+教育服务基于 NanoClaw Agent 扩展。教材检索为对话提供相关片段，本地视觉模块负责关键点推理，学习与会话数据由 SQLite 保存。
+
+## 技术栈
+
+- **Agent 与服务**：Python、NanoClaw、FastAPI、OpenAI 兼容模型接口。
+- **RAG**：文档解析、Embedding、FAISS、NumPy。
+- **视觉**：Ultralytics YOLO Pose、OpenCV。
+- **数据与渠道**：SQLite、bcrypt、Web、飞书与 MCP。
+
+## 快速开始
+
+### 1. 获取项目
+
+```bash
+git clone https://github.com/chuantiet5-stack/zhiqi-ai-education-assistant.git
+cd zhiqi-ai-education-assistant/nanoclaw
+```
+
+建议使用独立 Python 虚拟环境，见[开发指南](docs/development.md)。
+
+### 2. 安装与配置
+
+```bash
 python -m pip install -r requirements.txt
-Copy-Item config.example.json config.json
-# 编辑 config.json，填入自己的模型 API 密钥；飞书凭证按需配置。
+python -c "import shutil; shutil.copyfile('config.example.json', 'config.json')"
+```
+
+编辑 `config.json`，填写 `api_key`，并确认文本与视觉模型名称可由所配置的接口提供。飞书、RAG 和 MCP 设置见[配置指南](docs/configuration.md)。
+
+### 3. 启动服务
+
+```bash
 python main.py
 ```
 
-Web 默认端口为 `8080`。配置示例中的 MCP 启动命令使用 `python`，请确保它指向当前虚拟环境。教材索引和用户数据库未随公开源码发布，需在本地运行时创建或导入。
+| 入口 | 地址 |
+| --- | --- |
+| 注册与登录 | <http://127.0.0.1:8080> |
+| 学习工作台 | <http://127.0.0.1:8080/edu> |
+| 教材知识库管理 | <http://127.0.0.1:8080/rag_admin> |
 
-MCP 接入说明见 `nanoclaw/MCP_INTEGRATION.md`。
+首次使用需创建本地账号，并在知识库管理页导入自己的教材。专注监控需要运行服务的设备连接可用摄像头。
 
-## 发布说明
+## 项目结构
 
-公开版本仅保留源码和运行所需资源。原始 API 密钥、飞书凭证、用户数据库、聊天记录、上传图片、教材索引、日志和缓存均未提交；视频、PPT 和原始压缩包不上传。本地 `config.json` 使用 `config.example.json` 创建。
+```text
+.
+├── nanoclaw/
+│   ├── agent/
+│   │   ├── rag/                   # 文档解析、向量化与检索
+│   │   ├── tools/                 # 教育、视频、RAG 与视觉工具
+│   │   └── edu_loop.py            # 教育 Agent 执行循环
+│   ├── channels/web_ui/           # 登录、学习与知识库页面
+│   ├── db/                        # SQLite 持久层
+│   ├── mcp_servers/               # 古诗词工具服务
+│   ├── models/                    # YOLO Pose 本地模型
+│   ├── session/                   # 会话与持久记忆
+│   ├── edu_service.py             # 教育业务服务
+│   ├── focus_monitor.py           # 专注监控
+│   ├── parent_report.py           # 家长报告
+│   ├── config.example.json
+│   └── main.py
+└── docs/                          # 配置与开发文档
+```
 
-本次整理验证了发布文件及 Python 语法，未安装完整依赖或执行联网业务测试。
+## 文档
+
+- [配置与教材接入](docs/configuration.md)：模型、RAG、MCP、摄像头与飞书。
+- [开发与验证](docs/development.md)：开发环境、代码入口与功能验证流程。
+
+本地凭证、账号、教材索引、上传内容与会话数据由 `.gitignore` 排除。仓库不包含用户运行数据。
